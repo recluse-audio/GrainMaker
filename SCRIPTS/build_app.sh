@@ -4,5 +4,5 @@
 
 pushd build
 cmake -DCMAKE_BUILD_TYPE=Debug ..
-cmake --build . --target BLACK_PYRAMID_Standalone
+cmake --build . --target ArtieTune_Standalone
 popd # back to top level

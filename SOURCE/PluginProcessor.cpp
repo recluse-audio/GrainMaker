@@ -149,6 +149,8 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         juce::ignoreUnused (channelData);
         // ..do something to the data...
     }
+
+    buffer.applyGain(0.f);
 }
 
 //==============================================================================

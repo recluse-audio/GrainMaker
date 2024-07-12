@@ -3,7 +3,7 @@
 cmake_minimum_required(VERSION 3.24.1)
 
 # This is the name of your plugin (no spaces allowed)
-set(PROJECT_NAME "BLACK_PYRAMID")
+set(PROJECT_NAME "ArtieTune")
 
 # defines SourceFiles
 include(CMAKE/SourceFiles.cmake)   
