@@ -6,14 +6,28 @@ PluginEditor::PluginEditor (PluginProcessor& p)
 : AudioProcessorEditor (&p)
 , mProcessor (p)
 {
-	setSize(400, 400);
+	
+
+	mPitchDisplay = std::make_unique<juce::Label>();
+	addAndMakeVisible(mPitchDisplay.get());
+
+	// BOUNDS
+	this->setSize(400, 400);
+
+	mPitchDisplay->setBounds(100, 300, 50, 30);
+
+
+	// TIMER
+	startTimerHz(30);
 
 }
 
 //=================================
 PluginEditor::~PluginEditor()
 {
+	stopTimer();
 
+	mPitchDisplay.reset();
 }
 
 //==============================================================================
@@ -25,6 +39,13 @@ void PluginEditor::paint (juce::Graphics& g)
 
 //=================================
 void PluginEditor::resized()
+{
+
+}
+
+
+//==================================
+void PluginEditor::timerCallback()
 {
 
 }

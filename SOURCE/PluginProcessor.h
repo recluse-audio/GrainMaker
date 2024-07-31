@@ -2,6 +2,7 @@
 
 #include "Util/Juce_Header.h"
 
+class PitchDetector;
 
 #if (MSVC)
 #include "ipps.h"
@@ -39,9 +40,10 @@ public:
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 	
-	
+	//===================================
+    const float getLastDetectedPitch();
 private:
-
+    std::unique_ptr<PitchDetector> mPitchDetector;
 	
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PluginProcessor)
 };
