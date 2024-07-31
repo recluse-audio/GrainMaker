@@ -1,4 +1,8 @@
 set(SourceFiles
+    SOURCE/PITCH/PitchCorrector.cpp
+    SOURCE/PITCH/PitchCorrector.h
+    SOURCE/PITCH/PitchDetector.cpp
+    SOURCE/PITCH/PitchDetector.h
     SOURCE/PluginEditor.cpp
     SOURCE/PluginEditor.h
     SOURCE/PluginProcessor.cpp
