@@ -19,43 +19,39 @@ class PitchDetector
 {
 public:
 
-    class Params
-    {
-        int mBufferSize;
-        int mHalfBufferSize;
-        float* yinBuffer;
-        float probability;
-        float threshold;
-    };
-
     PitchDetector();
     ~PitchDetector();
 
-    void init(PitchDetector::Params* pParams, int bufferSize, float threshold);
     void prepareToPlay(double sampleRate, int samplesPerBlock);
 
-    void process(juce::AudioBuffer<float>& buffer);
+    void process(const float* buffer);
 
-    const double getCurrentPitch(PitchDetector::Params* pParams, float* buffer);
+    const double getCurrentPitch();
 
 private:
     // Conditions of the environment
     double mSampleRate = DEFAULT_SAMPLE_RATE;
     int mBufferSize = DEFAULT_BUFFER_SIZE;
-    int mHalfBufferSize = DEFAULT_BUFFER_SIZE / 2;
+    int mHalfBufferSize = DEFAULT_BUFFER_SIZE / 2; // save on division later?
+
+    // Allowed amount of uncertainty, inverse of minimum probability needed to count as a pitch
+    std::atomic<double> mThreshold = DEFAULT_THRESHOLD;
 
     // These are what we are calculating for
     std::atomic<double> mCurrentPitchHz = -1.0;
     std::atomic<double> mProbability = -1.0;
 
+    // Used to hold Auto-Correlation calculations
+    float* mYinBuffer = nullptr;
 
-    void _difference(PitchDetector::Params* pParams, int* buffer);
 
-    void _cumulativeMeanNormalizedDifference(PitchDetector::Params* pParams);
+    void _difference(const float* buffer);
 
-    int _absoluteThreshold(PitchDetector::Params* pParams);
+    void _cumulativeMeanNormalizedDifference();
 
-    float _parabolicInterpolation(PitchDetector::Params* pParams, int tauEstimate);
+    int _absoluteThreshold();
+
+    float _parabolicInterpolation(int tauEstimate);
 
     
 };

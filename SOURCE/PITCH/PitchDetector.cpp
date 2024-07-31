@@ -17,138 +17,131 @@ PitchDetector::~PitchDetector()
 void PitchDetector::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     mSampleRate = sampleRate;
-}
+    // TODO: This sets the pitch analysis window to always be the block size, but I don't think that needs to be a requirement
+    mBufferSize = samplesPerBlock;
+    mHalfBufferSize = samplesPerBlock / 2; // save division later in processBlock
 
-//
-void PitchDetector::init(PitchDetector::Params* pParams, int bufferSize, float threshold)
-{
-	/* Initialise the fields of the Yin structure passed in */
-	pParams->mBufferSize = bufferSize;
-	pParams->mHalfBufferSize = bufferSize / 2;
-	pParams->threshold = threshold;
-	pParams->probability = 0.0;
+    	/* Allocate the autocorellation buffer and initialise it to zero */
+	mYinBuffer = (float *) malloc(sizeof(float)* mHalfBufferSize);
 
-	/* Allocate the autocorellation buffer and initialise it to zero */
-	pParams->yinBuffer = (float *) malloc(sizeof(float)* pParams->mHalfBufferSize);
-
-	int16_t i;
-	for(i = 0; i < pParams->mHalfBufferSize; i++)
+	int i;
+	for(i = 0; i < mHalfBufferSize; i++)
     {
-		pParams->yinBuffer[i] = 0;
+		mYinBuffer[i] = 0;
 	}
 }
 
-//
-void PitchDetector::process(juce::AudioBuffer<float>& buffer)
-{
-
-}
 
 //
-const double PitchDetector::getCurrentPitch(PitchDetector::Params* pParams, float* buffer)
+void PitchDetector::process(const float* buffer)
 {
-	int16_t tauEstimate = -1;
+    int tauEstimate = -1;
 	float pitchInHertz = -1;
 	
 	/* Step 1: Calculates the squared difference of the signal with a shifted version of itself. */
-	_difference(pParams, buffer);
+	_difference(buffer);
 	
 	/* Step 2: Calculate the cumulative mean on the normalised difference calculated in step 1 */
-	_cumulativeMeanNormalizedDifference(pParams);
+	_cumulativeMeanNormalizedDifference();
 	
 	/* Step 3: Search through the normalised cumulative mean array and find values that are over the threshold */
-	tauEstimate = _absoluteThreshold(pParams);
+	tauEstimate = _absoluteThreshold();
 	
 	/* Step 5: Interpolate the shift value (tau) to improve the pitch estimate. */
 	if(tauEstimate != -1)
     {
-		pitchInHertz = mSampleRate / _parabolicInterpolation(pParams, tauEstimate);
+		pitchInHertz = mSampleRate / _parabolicInterpolation(tauEstimate);
 	}
-	
-	return pitchInHertz;
+
+    mCurrentPitchHz.store(pitchInHertz);
+}
+
+//
+const double PitchDetector::getCurrentPitch()
+{
+	return mCurrentPitchHz.load();
 }
 
 
-
-
 //
-void PitchDetector::_difference(PitchDetector::Params* pParams, float* buffer)
+void PitchDetector::_difference(const float* buffer)
 {
-	int16_t i;
-	int16_t tau;
+	int i;
+	int tau;
 	float delta;
 
-	for(tau = 0 ; tau < pParams->mHalfBufferSize; tau++)
+	for(tau = 0 ; tau < mHalfBufferSize; tau++)
     {
 
-		for(i = 0; i < pParams->mHalfBufferSize; i++)
+		for(i = 0; i < mHalfBufferSize; i++)
         {
 			delta = buffer[i] - buffer[i + tau];
-			pParams->yinBuffer[tau] += delta * delta;
+			mYinBuffer[tau] += delta * delta;
 		}
 	}
 }
 
 //
-void PitchDetector::_cumulativeMeanNormalizedDifference(PitchDetector::Params* pParams)
+void PitchDetector::_cumulativeMeanNormalizedDifference()
 {
-	int16_t tau;
+	int tau;
 	float runningSum = 0;
-	pParams->yinBuffer[0] = 1;
+	mYinBuffer[0] = 1;
 
 	/* Sum all the values in the autocorellation buffer and nomalise the result, replacing
 	 * the value in the autocorellation buffer with a cumulative mean of the normalised difference */
-	for (tau = 1; tau < pParams->mHalfBufferSize; tau++) {
-		runningSum += pParams->yinBuffer[tau];
-		pParams->yinBuffer[tau] *= tau / runningSum;
+	for (tau = 1; tau < mHalfBufferSize; tau++) 
+    {
+		runningSum += mYinBuffer[tau];
+		mYinBuffer[tau] *= tau / runningSum;
 	}
 }
 
 //
-int PitchDetector::_absoluteThreshold(PitchDetector::Params* pParams)
+int PitchDetector::_absoluteThreshold()
 {
-	int16_t tau;
+	int tau;
 
 	/* Search through the array of cumulative mean values, and look for ones that are over the threshold 
-	 * The first two positions in yinBuffer are always so start at the third (index 2) */
-	for (tau = 2; tau < pParams->mHalfBufferSize ; tau++) 
+	 * The first two positions in mYinBuffer are always so start at the third (index 2) */
+	for (tau = 2; tau < mHalfBufferSize ; tau++) 
     {
-		if (pParams->yinBuffer[tau] < pParams->threshold) 
+		if (mYinBuffer[tau] < mThreshold) 
         {
-			while (tau + 1 < pParams->mHalfBufferSize && pParams->yinBuffer[tau + 1] < pParams->yinBuffer[tau]) 
+			while (tau + 1 < mHalfBufferSize && mYinBuffer[tau + 1] < mYinBuffer[tau]) 
             {
 				tau++;
 			}
 			/* found tau, exit loop and return
 			 * store the probability
-			 * From the YIN paper: The pParams->threshold determines the list of
+			 * From the YIN paper: The threshold determines the list of
 			 * candidates admitted to the set, and can be interpreted as the
 			 * proportion of aperiodic power tolerated
 			 * within a periodic signal.
 			 *
 			 * Since we want the periodicity and and not aperiodicity:
 			 * periodicity = 1 - aperiodicity */
-			pParams->probability = 1 - pParams->yinBuffer[tau];
+			mProbability = 1 - mYinBuffer[tau];
 			break;
 		}
 	}
 
 	/* if no pitch found, tau => -1 */
-	if (tau == pParams->mHalfBufferSize || pParams->yinBuffer[tau] >= pParams->threshold) 
+	if (tau == mHalfBufferSize || mYinBuffer[tau] >= mThreshold) 
     {
 		tau = -1;
-		pParams->probability = 0;
+		mProbability = 0;
 	}
 
 	return tau;
 }
 
 //
-float PitchDetector::_parabolicInterpolation(PitchDetector::Params* pParams, int tauEstimate)
+float PitchDetector::_parabolicInterpolation(int tauEstimate)
 {
 	float betterTau;
-	int16_t x0;
-	int16_t x2;
+	int x0;
+	int x2;
 	
 	/* Calculate the first polynomial coeffcient based on the current estimate of tau */
 	if (tauEstimate < 1) 
@@ -161,7 +154,7 @@ float PitchDetector::_parabolicInterpolation(PitchDetector::Params* pParams, int
 	}
 
 	/* Calculate the second polynomial coeffcient based on the current estimate of tau */
-	if (tauEstimate + 1 < pParams->mHalfBufferSize) 
+	if (tauEstimate + 1 < mHalfBufferSize) 
     {
 		x2 = tauEstimate + 1;
 	} 
@@ -173,7 +166,7 @@ float PitchDetector::_parabolicInterpolation(PitchDetector::Params* pParams, int
 	/* Algorithm to parabolically interpolate the shift value tau to find a better estimate */
 	if (x0 == tauEstimate) 
     {
-		if (pParams->yinBuffer[tauEstimate] <= pParams->yinBuffer[x2]) 
+		if (mYinBuffer[tauEstimate] <= mYinBuffer[x2]) 
         {
 			betterTau = tauEstimate;
 		} 
@@ -184,7 +177,7 @@ float PitchDetector::_parabolicInterpolation(PitchDetector::Params* pParams, int
 	} 
 	else if (x2 == tauEstimate) 
     {
-		if (pParams->yinBuffer[tauEstimate] <= pParams->yinBuffer[x0]) 
+		if (mYinBuffer[tauEstimate] <= mYinBuffer[x0]) 
         {
 			betterTau = tauEstimate;
 		} 
@@ -196,9 +189,9 @@ float PitchDetector::_parabolicInterpolation(PitchDetector::Params* pParams, int
 	else 
     {
 		float s0, s1, s2;
-		s0 = pParams->yinBuffer[x0];
-		s1 = pParams->yinBuffer[tauEstimate];
-		s2 = pParams->yinBuffer[x2];
+		s0 = mYinBuffer[x0];
+		s1 = mYinBuffer[tauEstimate];
+		s2 = mYinBuffer[x2];
 		// fixed AUBIO implementation, thanks to Karl Helgason:
 		// (2.0f * s1 - s2 - s0) was incorrectly multiplied with -1
 		betterTau = tauEstimate + (s2 - s0) / (2 * (2 * s1 - s2 - s0));
