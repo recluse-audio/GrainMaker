@@ -1,0 +1,29 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Launch and Debug Standalone App",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/ArtieTune_artefacts/Debug/Standalone/ArtieTune.app/Contents/MacOS/ArtieTune",
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "name": "Launch and Debug Catch2 Tests",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/Tests",
+            "args": ["--break"],
+            "cwd": "${workspaceFolder}",
+            //"preLaunchTask": "Build and Run Catch2 Tests"
+        },
+        {
+            "name": "Attach to Process",
+            "type": "lldb",
+            "request": "attach",
+            "pid": "${command:pickProcess}"
+        }
+          
+    ]
+}

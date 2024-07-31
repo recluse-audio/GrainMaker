@@ -10,7 +10,7 @@ PluginEditor::PluginEditor (PluginProcessor& p)
 
 	mPitchDisplay = std::make_unique<juce::Label>();
 	addAndMakeVisible(mPitchDisplay.get());
-
+	
 	// BOUNDS
 	this->setSize(400, 400);
 
@@ -33,7 +33,7 @@ PluginEditor::~PluginEditor()
 //==============================================================================
 void PluginEditor::paint (juce::Graphics& g)
 {
-	g.fillAll(juce::Colours::whitesmoke);
+	g.fillAll(juce::Colours::navy);
 }
 
 
@@ -47,5 +47,7 @@ void PluginEditor::resized()
 //==================================
 void PluginEditor::timerCallback()
 {
-
+	float currentPitch = mProcessor.getLastDetectedPitch();
+	auto pitchString = juce::String(currentPitch);
+	mPitchDisplay->setText(pitchString, juce::NotificationType::dontSendNotification);
 }
