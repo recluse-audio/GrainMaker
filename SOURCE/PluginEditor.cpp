@@ -33,7 +33,7 @@ PluginEditor::~PluginEditor()
 //==============================================================================
 void PluginEditor::paint (juce::Graphics& g)
 {
-	g.fillAll(juce::Colours::navy);
+	g.fillAll(juce::Colours::red);
 }
 
 
