@@ -129,12 +129,7 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     auto totalNumInputChannels  = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
 
-    for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
-        buffer.clear (i, 0, buffer.getNumSamples());
-
-    // TODO: handle multi-channel, and that fun stuff
-    auto readPtr = buffer.getReadPointer(0);
-    mPitchDetector->process(readPtr);
+    mPitchDetector->process(buffer);
 
     // buffer.applyGain(0.f);
 }

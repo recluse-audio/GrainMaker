@@ -24,7 +24,7 @@ public:
 
     void prepareToPlay(double sampleRate, int samplesPerBlock);
 
-    void process(const float* buffer);
+    void process(juce::AudioBuffer<float>& buffer);
 
     const double getCurrentPitch();
 
@@ -42,10 +42,9 @@ private:
     std::atomic<double> mProbability = -1.0;
 
     // Used to hold Auto-Correlation calculations
-    float* mYinBuffer = nullptr;
+    std::vector<float> mYinBuffer;   
 
-
-    void _difference(const float* buffer);
+    void _difference(juce::AudioBuffer<float>& buffer);
 
     void _cumulativeMeanNormalizedDifference();
 

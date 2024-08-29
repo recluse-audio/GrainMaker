@@ -21,19 +21,14 @@ void PitchDetector::prepareToPlay(double sampleRate, int samplesPerBlock)
     mBufferSize = samplesPerBlock;
     mHalfBufferSize = samplesPerBlock / 2; // save division later in processBlock
 
-    	/* Allocate the autocorellation buffer and initialise it to zero */
-	mYinBuffer = (float *) malloc(sizeof(float)* mHalfBufferSize);
-
-	int i;
-	for(i = 0; i < mHalfBufferSize; i++)
-    {
-		mYinBuffer[i] = 0;
-	}
+    /* Allocate the autocorellation buffer and initialise it to zero */
+	mYinBuffer.resize(mHalfBufferSize);
+	std::fill(mYinBuffer.begin(), mYinBuffer.end(), 0.0f); // Initialize with zeroes if needed
 }
 
 
 //
-void PitchDetector::process(const float* buffer)
+void PitchDetector::process(juce::AudioBuffer<float>& buffer)
 {
     int tauEstimate = -1;
 	float pitchInHertz = -1;
@@ -64,18 +59,18 @@ const double PitchDetector::getCurrentPitch()
 
 
 //
-void PitchDetector::_difference(const float* buffer)
+void PitchDetector::_difference(juce::AudioBuffer<float>& buffer)
 {
-	int i;
-	int tau;
 	float delta;
 
-	for(tau = 0 ; tau < mHalfBufferSize; tau++)
+	for(int tau = 0 ; tau < mHalfBufferSize; tau++)
     {
 
-		for(i = 0; i < mHalfBufferSize; i++)
+		for(int i = 0; i < mHalfBufferSize; i++)
         {
-			delta = buffer[i] - buffer[i + tau];
+			float sample = buffer.getSample(0, i);
+			float shiftedSample = buffer.getSample(0, i+tau);
+			delta = sample - shiftedSample;
 			mYinBuffer[tau] += delta * delta;
 		}
 	}
@@ -84,16 +79,18 @@ void PitchDetector::_difference(const float* buffer)
 //
 void PitchDetector::_cumulativeMeanNormalizedDifference()
 {
-	int tau;
 	float runningSum = 0;
 	mYinBuffer[0] = 1;
 
 	/* Sum all the values in the autocorellation buffer and nomalise the result, replacing
 	 * the value in the autocorellation buffer with a cumulative mean of the normalised difference */
-	for (tau = 1; tau < mHalfBufferSize; tau++) 
+	for (int tau = 1; tau < mHalfBufferSize; tau++) 
     {
-		runningSum += mYinBuffer[tau];
-		mYinBuffer[tau] *= tau / runningSum;
+		runningSum += mYinBuffer[tau]; // what if 0?
+		if(runningSum > 0)
+			mYinBuffer[tau] *= tau / runningSum;
+		else
+			mYinBuffer[tau] = 1.0f;
 	}
 }
 
