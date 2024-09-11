@@ -1,5 +1,9 @@
 set(TestFiles
+    TESTS/TEST_UTILS/BufferGenerator.h
     TESTS/TEST_UTILS/TestUtils.cpp
     TESTS/TEST_UTILS/TestUtils.h
+    TESTS/test_BufferFiller.cpp
+    TESTS/test_CircularBuffer.cpp
     TESTS/test_PluginBasics.cpp
+    TESTS/test_Windowing.cpp
 )
