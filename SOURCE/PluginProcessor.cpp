@@ -1,6 +1,7 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 #include "PITCH/PitchDetector.h"
+#include "DSP_TOOLS/CircularBuffer.h"
 
 //==============================================================================
 PluginProcessor::PluginProcessor()
@@ -14,11 +15,13 @@ PluginProcessor::PluginProcessor()
                        )
 {
     mPitchDetector = std::make_unique<PitchDetector>();
+    mCircularBuffer = std::make_unique<CircularBuffer>();
 }
 
 PluginProcessor::~PluginProcessor()
 {
     mPitchDetector.reset();
+    mCircularBuffer.reset();
 }
 
 //==============================================================================
@@ -90,6 +93,7 @@ void PluginProcessor::changeProgramName (int index, const juce::String& newName)
 void PluginProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
     mPitchDetector->prepareToPlay(sampleRate, samplesPerBlock);
+    mCircularBuffer->setSize(this->getNumOutputChannels(), (int)sampleRate); // by default 1 second
 }
 
 void PluginProcessor::releaseResources()
@@ -129,8 +133,11 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     auto totalNumInputChannels  = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
 
+    
+    mCircularBuffer->pushBuffer(buffer);
+    buffer.clear(); // TESTTESTTEST clearing buffer to make sure it is only successfully refilled in the popBuffer function
+    mCircularBuffer->popBuffer(buffer);
     mPitchDetector->process(buffer);
-
     // buffer.applyGain(0.f);
 }
 

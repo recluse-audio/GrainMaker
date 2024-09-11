@@ -3,6 +3,7 @@
 #include "Util/Juce_Header.h"
 
 class PitchDetector;
+class CircularBuffer;
 
 #if (MSVC)
 #include "ipps.h"
@@ -44,6 +45,7 @@ public:
     const float getLastDetectedPitch();
 private:
     std::unique_ptr<PitchDetector> mPitchDetector;
+    std::unique_ptr<CircularBuffer> mCircularBuffer;
 	
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PluginProcessor)
 };

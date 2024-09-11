@@ -10,3 +10,7 @@ I made these scripts to easily call these actions from .vscode tasks, for which 
 I didn't have the scripts before, but I thought hey, what if someone has xcode or Vim?
 
 Also, it's annoying to change directories all the time for calling cmake commands.
+
+
+Call these from the root directory in a CLI:
+`/SCRIPTS/rebuild_all.sh`

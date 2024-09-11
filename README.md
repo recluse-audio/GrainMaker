@@ -1,2 +1,3 @@
-# BLACK_PYRAMID
-Mystery Noise Machine
+# ArtieTune
+YIN + TD_PSOLA
+
