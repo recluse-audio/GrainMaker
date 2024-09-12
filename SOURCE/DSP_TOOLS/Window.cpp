@@ -41,8 +41,8 @@ void Window::setShape(Window::Shape newShape)
 //
 void Window::_update()
 {
-    if(mCurrentShape == Window::kHanning)
+    if(mCurrentShape == Window::Shape::kHanning)
         BufferFiller::generateHanning(mBuffer);
-    else if(mCurrentShape == Window::kNone)
+    else if(mCurrentShape == Window::Shape::kNone)
         BufferFiller::fillWithAllOnes(mBuffer);
 }
