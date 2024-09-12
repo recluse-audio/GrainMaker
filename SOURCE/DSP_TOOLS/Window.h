@@ -37,8 +37,8 @@ class Window
 public:
     enum class Shape
     {
-        kNone,
-        kHanning,
+        kNone = 0,
+        kHanning = 1,
     };
 
     Window();
@@ -46,13 +46,11 @@ public:
 
     void setSampleRate(double sampleRate);
 
-    void setShape(Window::Shape newShape);
+    void setShape (Window::Shape newShape);
 
 private:
     friend class WindowTester;
     juce::AudioBuffer<float> mBuffer; // using juce buffer for some helpful functions, but could be a simple array
 
     Window::Shape mCurrentShape;
-
-    void _update();
 };
