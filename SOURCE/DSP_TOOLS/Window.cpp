@@ -20,11 +20,17 @@ Window::~Window()
 
 //====================
 //
-void Window::setSampleRate(double sampleRate)
+void Window::setSize(double newSize)
 {
-    mBuffer.setSize(1, (int) sampleRate); // 1 second worth of samples by default
+    mBuffer.setSize(1, (int) newSize); // 1 second worth of samples by default
 }
 
+//=====================
+//
+const int Window::getSize()
+{
+    return mBuffer.getNumSamples();
+}
 
 //==================
 //
@@ -46,3 +52,4 @@ void Window::_update()
     else if(mCurrentShape == Window::Shape::kNone)
         BufferFiller::fillWithAllOnes(mBuffer);
 }
+

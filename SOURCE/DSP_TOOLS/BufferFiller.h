@@ -28,6 +28,22 @@ public:
         }
     }
 
+    //=======================
+    // Value stored is equal to its index. Useful in testing
+    static void fillIncremental(juce::AudioBuffer<float>& bufferToFill)
+    {
+        bufferToFill.clear();
+        auto writePtr = bufferToFill.getArrayOfWritePointers();
+
+        for(int sampleIndex = 0; sampleIndex < bufferToFill.getNumSamples(); sampleIndex++)
+        {
+            for(int ch = 0; ch < bufferToFill.getNumChannels(); ch++)
+            {
+                writePtr[ch][sampleIndex] = (float)sampleIndex;
+            }
+
+        }
+    }
 
 
     //====================

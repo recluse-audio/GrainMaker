@@ -44,13 +44,25 @@ public:
     Window();
     ~Window();
 
-    void setSampleRate(double sampleRate);
+    // sets the numSamples of the underlying buffer.
+    // always 1 channel until I find a reason otherwise
+    void setSize(double newSize);
 
+    // gets the numSamples of the underlying buffer
+    const int getSize();
+    
+    // Fills the buffer with normalized float values 
+    // corresponding with various window shapes
+    // Does not resize but does clear 
     void setShape (Window::Shape newShape);
+
+
 
 private:
     friend class WindowTester;
     juce::AudioBuffer<float> mBuffer; // using juce buffer for some helpful functions, but could be a simple array
 
     Window::Shape mCurrentShape;
+
+    void _update();
 };

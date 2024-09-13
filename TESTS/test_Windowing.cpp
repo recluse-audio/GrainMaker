@@ -18,48 +18,74 @@ public:
     ~WindowTester(){}
 
     int getWindowSize() { return mWindow.mBuffer.getNumSamples(); }
-    int getWindowShape() { return mWindow.mCurrentShape; } // hack testing I know
+    // int getWindowShape() { return mWindow.mCurrentShape; } // hack testing I know
 
 private:
     Window& mWindow;
 };
 
 
+//=========================
+//
 TEST_CASE("Window can handle sample rate change")
 {
     Window w;
     WindowTester wt(w);
 
     double sampleRate = 48000;
-    w.setSampleRate(sampleRate);
+    w.setSize(sampleRate);
     CHECK( wt.getWindowSize() == sampleRate );
 
     sampleRate = 88200;
-    w.setSampleRate(sampleRate);
+    w.setSize(sampleRate);
     CHECK( wt.getWindowSize() == sampleRate );
 
     sampleRate = 96000;
-    w.setSampleRate(sampleRate);
+    w.setSize(sampleRate);
     CHECK( wt.getWindowSize() == sampleRate );
 
     sampleRate = 176400;
-    w.setSampleRate(sampleRate);
+    w.setSize(sampleRate);
     CHECK( wt.getWindowSize() == sampleRate );
 
     sampleRate = 192000;
-    w.setSampleRate(sampleRate);
+    w.setSize(sampleRate);
     CHECK( wt.getWindowSize() == sampleRate );
 }
 
 
 //=====================
 //
+TEST_CASE("Can get sample from window")
+{
+
+}
+
+//=====================
+//
 TEST_CASE("Can set and store shape of window ")
 {
-    Window w;
-    WindowTester wt(w);
+    // Window w;
+    // WindowTester wt(w);
 
-    w.setShape(Window::Shape::kHanning);
+    // w.setSize(1024);
+    // w.setShape(Window::Shape::kHanning);
 
+    // // checking values are normalized
+    // for(int sampleIndex = 0; sampleIndex <= numSamples; sampleIndex++)
+    // {
+    //     float sample = buffer.getSample(0, sampleIndex);
+    //     CHECK(sample >= 0.f);
+    //     CHECK(sample <= 1.f);
+    // }
+
+    // // checking symmetry
+    // for(int sampleIndex = 0; sampleIndex <= numSamples / 2.f; sampleIndex++)
+    // {
+    //     float sample1 = buffer.getSample(0, sampleIndex);
+    //     float sample2 = buffer.getSample(0, numSamples - sampleIndex);
+
+    //     CHECK(sample1 == Catch::Approx(sample2).epsilon(0.0001f));
+    // }
 
 }
