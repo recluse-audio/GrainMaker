@@ -34,3 +34,20 @@ TEST_CASE("Can make a Hanning Window")
         CHECK(sample1 == Catch::Approx(sample2).epsilon(0.0001f));
     }
 }
+
+//========================
+TEST_CASE("Can make an incremental buffer")
+{
+    int numSamples = 100;
+    juce::AudioBuffer<float> buffer(1, numSamples);
+
+    BufferFiller::fillIncremental(buffer);
+
+        // checking values are normalized
+    for(int sampleIndex = 0; sampleIndex < numSamples; sampleIndex++)
+    {
+        int sample = (int)buffer.getSample(0, sampleIndex);
+        CHECK(sample == sampleIndex );
+    }
+
+}
