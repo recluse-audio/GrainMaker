@@ -43,6 +43,8 @@ set(JUCE_COPY_PLUGIN_AFTER_BUILD ON)
 # JUCE is setup as a submodule in the /JUCE folder
 add_subdirectory(SUBMODULES/JUCE)
 
+# RD_DSP submodule
+add_subdirectory(SUBMODULES/RD_DSP)
 
 # Check the readme at `docs/CMake API.md` in the JUCE repo for full config
 juce_add_plugin("${PROJECT_NAME}"
@@ -129,6 +131,7 @@ set(JUCE_DEPENDENCIES
 target_link_libraries("${PROJECT_NAME}"
     PRIVATE
         ${JUCE_DEPENDENCIES}
+        RD_DSP
     PUBLIC
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags
