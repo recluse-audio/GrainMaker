@@ -125,7 +125,6 @@ set(JUCE_DEPENDENCIES
     juce::juce_audio_formats
     juce::juce_audio_processors
     juce::juce_audio_plugin_client
-    juce::juce_audio_utils
     juce::juce_dsp)
 
 target_link_libraries("${PROJECT_NAME}"
@@ -173,13 +172,13 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(Catch2) # find_package equivalent
 
 # Setup the test executable, again C++ 20 please
-add_executable(Tests ${TestFiles})
-target_compile_features(Tests PRIVATE cxx_std_20)
+add_executable(ArtieTune_Tests ${TestFiles})
+target_compile_features(ArtieTune_Tests PRIVATE cxx_std_20)
 
 
 # Our test executable also wants to know about our plugin code...
-target_include_directories(Tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/SOURCE)
-target_link_libraries(Tests PRIVATE Catch2::Catch2WithMain "${PROJECT_NAME}" ${JUCE_DEPENDENCIES})
+target_include_directories(ArtieTune_Tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/SOURCE)
+target_link_libraries(ArtieTune_Tests PRIVATE Catch2::Catch2WithMain "${PROJECT_NAME}" ${JUCE_DEPENDENCIES})
 
 # Make an Xcode Scheme for the test executable so we can run tests in the IDE
 set_target_properties(Catch2 PROPERTIES 
@@ -190,7 +189,7 @@ set_target_properties(Catch2WithMain PROPERTIES
     OSX_ARCHITECTURES "x86_64"      # Intel-only, required to prevent linker errors when building Tests as Intel-only
 )
 
-set_target_properties(Tests PROPERTIES
+set_target_properties(ArtieTune_Tests PROPERTIES
     OSX_ARCHITECTURES "x86_64"      # Intel-only
     XCODE_GENERATE_SCHEME ON        # Make an Xcode Scheme for the test executable so we can run tests in the IDE
 )
@@ -201,7 +200,7 @@ source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/TESTS PREFIX "" FILES ${TestFiles}
 # https://github.com/catchorg/Catch2/blob/devel/docs/cmake-integration.md
 # We have to manually provide the source directory here for now
 include(${Catch2_SOURCE_DIR}/extras/Catch.cmake)
-catch_discover_tests(Tests)
+catch_discover_tests(ArtieTune_Tests)
 
 # Color our warnings and errors
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
