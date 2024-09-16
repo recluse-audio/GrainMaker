@@ -1,4 +1,4 @@
-set(SourceFiles
+set(SOURCES
     SOURCE/DSP_TOOLS/BufferFiller.h
     SOURCE/DSP_TOOLS/CircularBuffer.cpp
     SOURCE/DSP_TOOLS/CircularBuffer.h
@@ -15,4 +15,9 @@ set(SourceFiles
     SOURCE/PluginProcessor.cpp
     SOURCE/PluginProcessor.h
     SOURCE/Util/Juce_Header.h
+    SUBMODULES/RD/SOURCE/BufferFiller.h
+    SUBMODULES/RD/SOURCE/CircularBuffer.cpp
+    SUBMODULES/RD/SOURCE/CircularBuffer.h
+    SUBMODULES/RD/SOURCE/Window.cpp
+    SUBMODULES/RD/SOURCE/Window.h
 )
