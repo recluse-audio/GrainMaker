@@ -5,8 +5,9 @@ cmake_minimum_required(VERSION 3.24.1)
 # This is the name of your plugin (no spaces allowed)
 set(PROJECT_NAME "ArtieTune")
 
-# defines SourceFiles
-include(CMAKE/SourceFiles.cmake)   
+# defines SOURCES
+include(CMAKE/SOURCES.cmake)   
+include
 
 # Valid formats: AAX Unity VST AU AUv3 Standalone
 set(FORMATS AU VST3 AUv3 Standalone)
@@ -80,7 +81,7 @@ target_include_directories(${PROJECT_NAME}
 
 
 
-target_sources("${PROJECT_NAME}" PRIVATE ${SourceFiles})
+target_sources("${PROJECT_NAME}" PRIVATE ${SOURCES})
 
 
 set_target_properties("${PROJECT_NAME}" PROPERTIES 
@@ -89,7 +90,7 @@ set_target_properties("${PROJECT_NAME}" PROPERTIES
 )
 
 # The Xcode source tree should uhhh, still look like the source tree, yo
-source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/SOURCE PREFIX "" FILES ${SourceFiles})
+source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/SOURCE PREFIX "" FILES ${SOURCES})
 
 
 
