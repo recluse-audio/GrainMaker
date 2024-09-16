@@ -7,7 +7,8 @@ set(PROJECT_NAME "ArtieTune")
 
 # defines SOURCES
 include(CMAKE/SOURCES.cmake)   
-include
+# defines TESTS
+include(CMAKE/TESTS.cmake)
 
 # Valid formats: AAX Unity VST AU AUv3 Standalone
 set(FORMATS AU VST3 AUv3 Standalone)
@@ -89,13 +90,6 @@ set_target_properties("${PROJECT_NAME}" PROPERTIES
     FOLDER ""
 )
 
-# The Xcode source tree should uhhh, still look like the source tree, yo
-source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/SOURCE PREFIX "" FILES ${SOURCES})
-
-
-
-
-
 
 
 
@@ -153,11 +147,6 @@ endif()
 # You also could forgo ctest and call ./Tests directly from the build dir
 enable_testing()
 
-# "GLOBS ARE BAD" is brittle and silly dev UX, sorry CMake!
-# CONFIGURE_DEPENDS / Clion's CMake integration makes globbing absolutely fine
-file(GLOB_RECURSE TestFiles CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/TESTS/*.cpp" "${CMAKE_CURRENT_SOURCE_DIR}/TESTS/*.h")
-source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/TESTS PREFIX "" FILES ${TestFiles})
-
 
 
 # Use Catch2 v3 on the devel branch
@@ -171,29 +160,16 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(Catch2) # find_package equivalent
 
 # Setup the test executable, again C++ 20 please
-add_executable(ArtieTune_Tests ${TestFiles})
+add_executable(ArtieTune_Tests ${TESTS})
 target_compile_features(ArtieTune_Tests PRIVATE cxx_std_20)
+
+target_sources(ArtieTune_Tests PRIVATE ${TESTS})
 
 
 # Our test executable also wants to know about our plugin code...
 target_include_directories(ArtieTune_Tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/SOURCE)
 target_link_libraries(ArtieTune_Tests PRIVATE Catch2::Catch2WithMain "${PROJECT_NAME}" ${JUCE_DEPENDENCIES})
 
-# Make an Xcode Scheme for the test executable so we can run tests in the IDE
-set_target_properties(Catch2 PROPERTIES 
-    OSX_ARCHITECTURES "x86_64"      # Intel-only, required to prevent linker errors when building Tests as Intel-only
-)
-
-set_target_properties(Catch2WithMain PROPERTIES
-    OSX_ARCHITECTURES "x86_64"      # Intel-only, required to prevent linker errors when building Tests as Intel-only
-)
-
-set_target_properties(ArtieTune_Tests PROPERTIES
-    OSX_ARCHITECTURES "x86_64"      # Intel-only
-    XCODE_GENERATE_SCHEME ON        # Make an Xcode Scheme for the test executable so we can run tests in the IDE
-)
-# Organize the test source in the Tests/ folder in the IDE
-source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/TESTS PREFIX "" FILES ${TestFiles})
 
 # Load and use the .cmake file provided by Catch2
 # https://github.com/catchorg/Catch2/blob/devel/docs/cmake-integration.md
