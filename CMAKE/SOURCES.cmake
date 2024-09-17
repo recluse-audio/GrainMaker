@@ -13,6 +13,7 @@ set(SOURCES
     SUBMODULES/RD/SOURCE/BufferFiller.h
     SUBMODULES/RD/SOURCE/CircularBuffer.cpp
     SUBMODULES/RD/SOURCE/CircularBuffer.h
+    SUBMODULES/RD/SOURCE/Interpolator.h
     SUBMODULES/RD/SOURCE/Window.cpp
     SUBMODULES/RD/SOURCE/Window.h
 )
