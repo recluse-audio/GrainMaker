@@ -1,9 +1,4 @@
 set(SOURCES
-    SOURCE/DSP_TOOLS/BufferFiller.h
-    SOURCE/DSP_TOOLS/CircularBuffer.cpp
-    SOURCE/DSP_TOOLS/CircularBuffer.h
-    SOURCE/DSP_TOOLS/Window.cpp
-    SOURCE/DSP_TOOLS/Window.h
     SOURCE/PITCH/PitchCorrector.cpp
     SOURCE/PITCH/PitchCorrector.h
     SOURCE/PITCH/PitchDetector.cpp
