@@ -1,7 +1,7 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 #include "PITCH/PitchDetector.h"
-#include "SUBMODULES/RD/SOURCE/CircularBuffer.h"
+#include "../SUBMODULES/RD/SOURCE/CircularBuffer.h"
 
 //==============================================================================
 PluginProcessor::PluginProcessor()

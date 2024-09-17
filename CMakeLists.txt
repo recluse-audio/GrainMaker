@@ -123,7 +123,6 @@ set(JUCE_DEPENDENCIES
 target_link_libraries("${PROJECT_NAME}"
     PRIVATE
         ${JUCE_DEPENDENCIES}
-        RD_DSP
     PUBLIC
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags
@@ -160,22 +159,22 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(Catch2) # find_package equivalent
 
 # Setup the test executable, again C++ 20 please
-add_executable(ArtieTune_Tests ${TESTS})
-target_compile_features(ArtieTune_Tests PRIVATE cxx_std_20)
+add_executable(Tests ${TESTS})
+target_compile_features(Tests PRIVATE cxx_std_20)
 
-target_sources(ArtieTune_Tests PRIVATE ${TESTS})
+target_sources(Tests PRIVATE ${TESTS})
 
 
 # Our test executable also wants to know about our plugin code...
-target_include_directories(ArtieTune_Tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/SOURCE)
-target_link_libraries(ArtieTune_Tests PRIVATE Catch2::Catch2WithMain "${PROJECT_NAME}" ${JUCE_DEPENDENCIES})
+target_include_directories(Tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/SOURCE)
+target_link_libraries(Tests PRIVATE Catch2::Catch2WithMain "${PROJECT_NAME}" ${JUCE_DEPENDENCIES})
 
 
 # Load and use the .cmake file provided by Catch2
 # https://github.com/catchorg/Catch2/blob/devel/docs/cmake-integration.md
 # We have to manually provide the source directory here for now
 include(${Catch2_SOURCE_DIR}/extras/Catch.cmake)
-catch_discover_tests(ArtieTune_Tests)
+catch_discover_tests(Tests)
 
 # Color our warnings and errors
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
