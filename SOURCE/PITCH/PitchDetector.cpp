@@ -19,11 +19,19 @@ void PitchDetector::prepareToPlay(double sampleRate, int samplesPerBlock)
     mSampleRate = sampleRate;
     // TODO: This sets the pitch analysis window to always be the block size, but I don't think that needs to be a requirement
     mBufferSize = samplesPerBlock;
-    mHalfBufferSize = samplesPerBlock / 2; // save division later in processBlock
-
+	// mHalfBufferSize = samplesPerBlock / 2;
+    int analysisSize = samplesPerBlock / 2; // save division later in processBlock
+	mHalfBufferSize = analysisSize; // TODO: Pick one of these to use
+	
     /* Allocate the autocorellation buffer and initialise it to zero */
-	mYinBuffer.resize(mHalfBufferSize);
+	mYinBuffer.resize(analysisSize);
+	mDifference.resize(analysisSize);
+	mNormalizedDifference.resize(analysisSize);
+
 	std::fill(mYinBuffer.begin(), mYinBuffer.end(), 0.0f); // Initialize with zeroes if needed
+	std::fill(mDifference.begin(), mDifference.end(), 0.0f); // Initialize with zeroes if needed
+	std::fill(mNormalizedDifference.begin(), mNormalizedDifference.end(), 0.0f); // Initialize with zeroes if needed
+
 }
 
 
@@ -45,7 +53,8 @@ void PitchDetector::process(juce::AudioBuffer<float>& buffer)
 	/* Step 5: Interpolate the shift value (tau) to improve the pitch estimate. */
 	if(tauEstimate != -1)
     {
-		pitchInHertz = mSampleRate / _parabolicInterpolation(tauEstimate);
+		auto bestPeriodEstimate = _getBestTau(tauEstimate);
+		pitchInHertz = mSampleRate / bestPeriodEstimate;
 	}
 
     mCurrentPitchHz.store(pitchInHertz);
@@ -71,7 +80,7 @@ void PitchDetector::_difference(juce::AudioBuffer<float>& buffer)
 			float sample = buffer.getSample(0, i);
 			float shiftedSample = buffer.getSample(0, i+tau);
 			delta = sample - shiftedSample;
-			mYinBuffer[tau] += delta * delta;
+			mDifference[tau] += delta * delta;
 		}
 	}
 }
@@ -80,32 +89,33 @@ void PitchDetector::_difference(juce::AudioBuffer<float>& buffer)
 void PitchDetector::_cumulativeMeanNormalizedDifference()
 {
 	float runningSum = 0;
-	mYinBuffer[0] = 1;
+	mDifference[0] = 1;
 
 	/* Sum all the values in the autocorellation buffer and nomalise the result, replacing
 	 * the value in the autocorellation buffer with a cumulative mean of the normalised difference */
 	for (int tau = 1; tau < mHalfBufferSize; tau++) 
     {
-		runningSum += mYinBuffer[tau]; // what if 0?
+		runningSum += mDifference[tau]; // what if 0?
 		if(runningSum > 0)
-			mYinBuffer[tau] *= tau / runningSum;
+			mNormalizedDifference[tau] = mDifference[tau] * (tau / runningSum);
 		else
-			mYinBuffer[tau] = 1.0f;
+			mNormalizedDifference[tau] = 1.0f;
 	}
 }
 
-//
+// smallest value of tau that gives a minimum of cumulative diff that is above the threshold
 int PitchDetector::_absoluteThreshold()
 {
-	int tau;
+	int tau = 0;
 
-	/* Search through the array of cumulative mean values, and look for ones that are over the threshold 
-	 * The first two positions in mYinBuffer are always so start at the third (index 2) */
+	/* Search through the vector of cumulative mean values, and look for ones that are over the threshold 
+	 * The first two positions in vector are always so start at the third (index 2) */
 	for (tau = 2; tau < mHalfBufferSize ; tau++) 
     {
-		if (mYinBuffer[tau] < mThreshold) 
+		if (mNormalizedDifference[tau] < mThreshold) 
         {
-			while (tau + 1 < mHalfBufferSize && mYinBuffer[tau + 1] < mYinBuffer[tau]) 
+			bool nextTauLessThanHalfBufferSize = tau + 1 < mHalfBufferSize;
+			while (tau + 1 < mHalfBufferSize && mNormalizedDifference[tau + 1] < mNormalizedDifference[tau]) 
             {
 				tau++;
 			}
@@ -118,13 +128,13 @@ int PitchDetector::_absoluteThreshold()
 			 *
 			 * Since we want the periodicity and and not aperiodicity:
 			 * periodicity = 1 - aperiodicity */
-			mProbability = 1 - mYinBuffer[tau];
+			mProbability = 1 - mNormalizedDifference[tau];
 			break;
 		}
 	}
 
 	/* if no pitch found, tau => -1 */
-	if (tau == mHalfBufferSize || mYinBuffer[tau] >= mThreshold) 
+	if (tau == mHalfBufferSize || mNormalizedDifference[tau] >= mThreshold) 
     {
 		tau = -1;
 		mProbability = 0;
@@ -134,7 +144,7 @@ int PitchDetector::_absoluteThreshold()
 }
 
 //
-float PitchDetector::_parabolicInterpolation(int tauEstimate)
+float PitchDetector::_getBestTau(int tauEstimate)
 {
 	float betterTau;
 	int x0;
@@ -163,7 +173,7 @@ float PitchDetector::_parabolicInterpolation(int tauEstimate)
 	/* Algorithm to parabolically interpolate the shift value tau to find a better estimate */
 	if (x0 == tauEstimate) 
     {
-		if (mYinBuffer[tauEstimate] <= mYinBuffer[x2]) 
+		if (mNormalizedDifference[tauEstimate] <= mNormalizedDifference[x2]) 
         {
 			betterTau = tauEstimate;
 		} 
@@ -174,7 +184,7 @@ float PitchDetector::_parabolicInterpolation(int tauEstimate)
 	} 
 	else if (x2 == tauEstimate) 
     {
-		if (mYinBuffer[tauEstimate] <= mYinBuffer[x0]) 
+		if (mNormalizedDifference[tauEstimate] <= mNormalizedDifference[x0]) 
         {
 			betterTau = tauEstimate;
 		} 
