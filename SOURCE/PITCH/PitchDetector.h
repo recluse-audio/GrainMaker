@@ -43,14 +43,20 @@ private:
 
     // Used to hold Auto-Correlation calculations
     std::vector<float> mYinBuffer;   
+    // These buffers are probably temporary, the operations can be done on a single buffer
+    std::vector<float> mDifference;
+    std::vector<float> mNormalizedDifference;
 
     void _difference(juce::AudioBuffer<float>& buffer);
 
     void _cumulativeMeanNormalizedDifference();
 
+    // Smallest tau above a threshold 
+    // This threshold is the acceptable amount of normalized difference
     int _absoluteThreshold();
 
-    float _parabolicInterpolation(int tauEstimate);
+    // 
+    float _getBestTau(int tauEstimate);
 
     
 };
