@@ -196,9 +196,9 @@ float PitchDetector::_getBestTau(int tauEstimate)
 	else 
     {
 		float s0, s1, s2;
-		s0 = mYinBuffer[x0];
-		s1 = mYinBuffer[tauEstimate];
-		s2 = mYinBuffer[x2];
+		s0 = mNormalizedDifference[x0];
+		s1 = mNormalizedDifference[tauEstimate];
+		s2 = mNormalizedDifference[x2];
 		// fixed AUBIO implementation, thanks to Karl Helgason:
 		// (2.0f * s1 - s2 - s0) was incorrectly multiplied with -1
 		betterTau = tauEstimate + (s2 - s0) / (2 * (2 * s1 - s2 - s0));
