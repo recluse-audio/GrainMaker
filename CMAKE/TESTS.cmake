@@ -1,10 +1,13 @@
 set(TESTS
     SUBMODULES/RD/TESTS/test_BufferFiller.cpp
+    SUBMODULES/RD/TESTS/test_BufferMath.cpp
+    SUBMODULES/RD/TESTS/test_BufferWriter.cpp
     SUBMODULES/RD/TESTS/test_CircularBuffer.cpp
     SUBMODULES/RD/TESTS/test_Windowing.cpp
     SUBMODULES/RD/TESTS/tests_Interpolator.cpp
     TESTS/TEST_UTILS/BufferGenerator.h
     TESTS/TEST_UTILS/TestUtils.cpp
     TESTS/TEST_UTILS/TestUtils.h
+    TESTS/test_PitchDetector.cpp
     TESTS/test_PluginBasics.cpp
 )

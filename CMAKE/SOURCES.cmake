@@ -11,6 +11,8 @@ set(SOURCES
     SOURCE/PluginProcessor.h
     SOURCE/Util/Juce_Header.h
     SUBMODULES/RD/SOURCE/BufferFiller.h
+    SUBMODULES/RD/SOURCE/BufferMath.h
+    SUBMODULES/RD/SOURCE/BufferWriter.h
     SUBMODULES/RD/SOURCE/CircularBuffer.cpp
     SUBMODULES/RD/SOURCE/CircularBuffer.h
     SUBMODULES/RD/SOURCE/Interpolator.h
