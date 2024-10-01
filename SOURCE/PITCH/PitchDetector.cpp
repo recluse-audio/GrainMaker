@@ -89,7 +89,7 @@ void PitchDetector::_difference(juce::AudioBuffer<float>& buffer)
 void PitchDetector::_cumulativeMeanNormalizedDifference()
 {
 	float runningSum = 0;
-	mDifference[0] = 1;
+	mNormalizedDifference[0] = 1;
 
 	/* Sum all the values in the autocorellation buffer and nomalise the result, replacing
 	 * the value in the autocorellation buffer with a cumulative mean of the normalised difference */
