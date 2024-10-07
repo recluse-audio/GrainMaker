@@ -107,7 +107,8 @@
 			"concepts": "cpp",
 			"numeric": "cpp",
 			"random": "cpp",
-			"algorithm": "cpp"
+			"algorithm": "cpp",
+			"*.mm": "cpp"
 		}
 	}
 }
