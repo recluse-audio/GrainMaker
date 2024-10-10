@@ -109,7 +109,7 @@ int PitchDetector::_absoluteThreshold()
 	int tau = 0;
 
 	/* Search through the vector of cumulative mean values, and look for ones that are over the threshold 
-	 * The first two positions in vector are always so start at the third (index 2) */
+	 * The first two positions in vector are always 1 so start at the third (index 2) */
 	for (tau = 2; tau < mHalfBufferSize ; tau++) 
     {
 		if (mNormalizedDifference[tau] < mThreshold) 
