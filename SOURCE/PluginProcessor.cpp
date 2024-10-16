@@ -133,11 +133,11 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     auto totalNumInputChannels  = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
 
-    
+    float pitch = mPitchDetector->process(buffer);
+
     mCircularBuffer->pushBuffer(buffer);
     buffer.clear(); // TESTTESTTEST clearing buffer to make sure it is only successfully refilled in the popBuffer function
     mCircularBuffer->popBuffer(buffer);
-    mPitchDetector->process(buffer);
     // buffer.applyGain(0.f);
 }
 
