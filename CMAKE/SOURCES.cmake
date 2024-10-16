@@ -3,6 +3,8 @@ set(SOURCES
     SOURCE/PITCH/PitchCorrector.h
     SOURCE/PITCH/PitchDetector.cpp
     SOURCE/PITCH/PitchDetector.h
+    SOURCE/PITCH/PitchDetector_backup.cpp
+    SOURCE/PITCH/PitchDetector_backup.h
     SOURCE/PITCH/PitchMarkedCircularBuffer.cpp
     SOURCE/PITCH/PitchMarkedCircularBuffer.h
     SOURCE/PluginEditor.cpp

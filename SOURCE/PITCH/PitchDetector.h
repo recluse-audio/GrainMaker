@@ -22,17 +22,17 @@ public:
     PitchDetector();
     ~PitchDetector();
 
-    void prepareToPlay(double sampleRate, int samplesPerBlock);
+    void prepareToPlay(double sampleRate, int blockSize);
 
-    void process(juce::AudioBuffer<float>& buffer);
+    // split it up however you like, this tells you what pitch is the fundamental in that buffer.
+    float process(juce::AudioBuffer<float>& buffer);
 
     const double getCurrentPitch();
 
 private:
     // Conditions of the environment
     double mSampleRate = DEFAULT_SAMPLE_RATE;
-    int mBufferSize = DEFAULT_BUFFER_SIZE;
-    int mHalfBufferSize = DEFAULT_BUFFER_SIZE / 2; // save on division later?
+    int mHalfBlock = 0;
 
     // Allowed amount of uncertainty, inverse of minimum probability needed to count as a pitch
     std::atomic<double> mThreshold = DEFAULT_THRESHOLD;
@@ -41,22 +41,9 @@ private:
     std::atomic<double> mCurrentPitchHz = -1.0;
     std::atomic<double> mProbability = -1.0;
 
-    // Used to hold Auto-Correlation calculations
-    std::vector<float> mYinBuffer;   
-    // These buffers are probably temporary, the operations can be done on a single buffer
-    std::vector<float> mDifference;
-    std::vector<float> mNormalizedDifference;
+    juce::AudioBuffer<float> differenceBuffer;
+    juce::AudioBuffer<float> cmndBuffer; // "Cumulative Mean Normalized Difference" buffer, you can thank YIN for this abbrev.
 
-    void _difference(juce::AudioBuffer<float>& buffer);
-
-    void _cumulativeMeanNormalizedDifference();
-
-    // Smallest tau above a threshold 
-    // This threshold is the acceptable amount of normalized difference
-    int _absoluteThreshold();
-
-    // 
-    float _getBestTau(int tauEstimate);
 
     
 };
