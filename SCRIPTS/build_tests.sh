@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/zsh
 
 pushd BUILD
 cmake  -DCMAKE_BUILD_TYPE=Debug ..
