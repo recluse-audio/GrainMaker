@@ -26,13 +26,19 @@ public:
 
     // Allows you to push a buffer of audio samples to this circular buffer
     // Notice this does not override "pushBuffer" from the base class
-    bool pushBufferAndPitch(juce::AudioBuffer<float>& buffer, float pitchInHz);
+    bool pushBufferAndPeriod(juce::AudioBuffer<float>& buffer, float periodInSamples);
 
     // fills buffer with audio data starting from mReadPos over the range of the buffer's length in samples
     // returns float estimate of this range
     float popBufferAndPitch(juce::AudioBuffer<float>& buffer, juce::AudioBuffer<float>& pitchBuffer);
+
+    void popAudioBuffer(juce::AudioBuffer<float>& buffer);
 private: 
     friend class PitchBufferTest; 
+
+    // Returns sample index in a given range of a buffer. Index is relative to 'start' argument, not buffer[0][0]
+    // TODO: handle stereo 
+    int _findMaxSampleIndex(juce::AudioBuffer<float>& buffer, int start, int length);
 
     CircularBuffer mAudioBuffer;
     CircularBuffer mPitchBuffer;

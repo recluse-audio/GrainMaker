@@ -1,4 +1,6 @@
 set(SOURCES
+    SOURCE/PITCH/GrainCorrector.cpp
+    SOURCE/PITCH/GrainCorrector.h
     SOURCE/PITCH/PitchCorrector.cpp
     SOURCE/PITCH/PitchCorrector.h
     SOURCE/PITCH/PitchDetector.cpp
