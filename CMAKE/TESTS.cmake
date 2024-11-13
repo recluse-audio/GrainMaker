@@ -8,6 +8,7 @@ set(TESTS
     TESTS/TEST_UTILS/BufferGenerator.h
     TESTS/TEST_UTILS/TestUtils.cpp
     TESTS/TEST_UTILS/TestUtils.h
+    TESTS/test_GrainCorrector.cpp
     TESTS/test_PitchDetector.cpp
     TESTS/test_PitchMarkedCircularBuffer.cpp
     TESTS/test_PluginBasics.cpp

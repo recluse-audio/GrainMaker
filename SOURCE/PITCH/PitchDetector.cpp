@@ -31,7 +31,7 @@ void PitchDetector::prepareToPlay(double sampleRate, int blockSize)
 //
 float PitchDetector::process(juce::AudioBuffer<float>& buffer)
 {
-	float pitchInHertz = -1;
+	float periodEstimate = -1.f;
 	differenceBuffer.clear();
 	cmndBuffer.clear();
 	// /* Step 1: Calculates the squared difference of the signal with a shifted version of itself. */
@@ -44,12 +44,15 @@ float PitchDetector::process(juce::AudioBuffer<float>& buffer)
 	if(tauEstimate > 0)
 	{
 		// doing difference buffer on purpose per yin paper
-		float bestTauEstimate = BufferMath::yin_parabolic_interpolation(cmndBuffer, tauEstimate);
-		pitchInHertz = mSampleRate / bestTauEstimate;
+		periodEstimate = BufferMath::yin_parabolic_interpolation(cmndBuffer, tauEstimate);
+		mCurrentPeriod.store(periodEstimate);
+		// pitchInHertz = mSampleRate / bestTauEstimate;
 	}
 
-	mCurrentPitchHz.store(pitchInHertz);
-	return pitchInHertz;
+	return periodEstimate;
+
+	// mCurrentPitchHz.store(pitchInHertz);
+	// return pitchInHertz;
 }
 
 //
@@ -58,5 +61,9 @@ const double PitchDetector::getCurrentPitch()
 	return mCurrentPitchHz.load();
 }
 
+const double PitchDetector::getCurrentPeriod()
+{
+	return mCurrentPeriod.load();
+}
 
 //

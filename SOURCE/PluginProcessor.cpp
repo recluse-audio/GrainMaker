@@ -181,5 +181,6 @@ juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 //
 const float PluginProcessor::getLastDetectedPitch()
 {
-    return mPitchDetector->getCurrentPitch();
+    float pitch = this->getSampleRate() / mPitchDetector->getCurrentPeriod();
+    return pitch;
 }

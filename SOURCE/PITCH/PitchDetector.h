@@ -28,6 +28,7 @@ public:
     float process(juce::AudioBuffer<float>& buffer);
 
     const double getCurrentPitch();
+    const double getCurrentPeriod();
 
 private:
     // Conditions of the environment
@@ -39,6 +40,7 @@ private:
 
     // These are what we are calculating for
     std::atomic<double> mCurrentPitchHz = -1.0;
+    std::atomic<double> mCurrentPeriod = -1.0;
     std::atomic<double> mProbability = -1.0;
 
     juce::AudioBuffer<float> differenceBuffer;
