@@ -5,7 +5,7 @@
 //
 PitchMarkedCircularBuffer::PitchMarkedCircularBuffer()
 {
-    setSize(1, 88200);
+    setSize(2, 88200);
 }
 
 
@@ -42,11 +42,14 @@ bool PitchMarkedCircularBuffer::pushBufferAndPeriod(juce::AudioBuffer<float>& bu
             // write periodInSamples at this index
             if(indexInPeriod == maxInPeriodIndex)
             {
-                mPitchBuffer.pushValue(1, periodInSamples);
+                // store period in mPitchBuffer ch[0] and store index in period of marker at ch[1]
+                mPitchBuffer.pushValue(1, periodInSamples, 0, false);
+                mPitchBuffer.pushValue(1, maxInPeriodIndex, 1, true); // increment now
             }
             else // write zeros before and after maxSampleIndex
             {
-                mPitchBuffer.pushValue(1, 0);
+                mPitchBuffer.pushValue(1, 0, 0, false);
+                mPitchBuffer.pushValue(1, 0, 1, true);
             }
 
         }

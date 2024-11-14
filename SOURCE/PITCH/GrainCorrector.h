@@ -68,6 +68,11 @@ public:
      */
     void correct(juce::AudioBuffer<float>& audioBuffer, juce::AudioBuffer<float>& pitchBuffer);
 
+    /**
+     * @brief Sets internal m
+     * 
+     */
+
 private:
     friend class GrainCorrectorTest;
     PitchMarkedCircularBuffer& mPitchMarkedBuffer;
@@ -83,7 +88,7 @@ private:
     void _updateAnalysisSize();
 
     // 
-    void _makeGrain();
+    void _makeGrain(juce::dsp::AudioBlock<float> readBlock, juce::dsp::AudioBlock<float> writeBlock);
 
     float mTransposeRatio = 1.0; // default, no transpose
     int mOutputDelay = 0;

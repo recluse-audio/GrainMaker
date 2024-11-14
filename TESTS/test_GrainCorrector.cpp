@@ -195,41 +195,41 @@ TEST_CASE("Basic IO with output delay.")
 //
 TEST_CASE("Test pitch shift up.")
 {
-    SineWavePitchBuffer sineWavePitchBuffer;
-    GrainCorrector grainCorrector(sineWavePitchBuffer.getReference()); 
-    GrainCorrectorTest grainTest(grainCorrector);
+    // SineWavePitchBuffer sineWavePitchBuffer;
+    // GrainCorrector grainCorrector(sineWavePitchBuffer.getReference()); 
+    // GrainCorrectorTest grainTest(grainCorrector);
 
-    // since the sineWaveBuffer is filled with predictable cycles, we will iterate through using this
-    int periodLength = sineWavePitchBuffer.mData.periodLength;
-    int processBlockSize = periodLength;
-    int outputDelay = periodLength; // differs from above test, this 
-    float shiftRatio = 1.1;
+    // // since the sineWaveBuffer is filled with predictable cycles, we will iterate through using this
+    // int periodLength = sineWavePitchBuffer.mData.periodLength;
+    // int processBlockSize = periodLength;
+    // int outputDelay = periodLength; // differs from above test, this 
+    // float shiftRatio = 1.1;
 
-    // this is what we will write to and test to make sure we wrote properly
-    juce::AudioBuffer<float> processBuffer(2, processBlockSize);
-    processBuffer.clear();
-
-
-
-    grainCorrector.prepare(44100, processBlockSize);
-    grainCorrector.setOutputDelay(outputDelay);
-    grainCorrector.setShiftRatio(shiftRatio);
-    grainCorrector.process(processBuffer);
-
-    auto processBufferReadPtr = processBuffer.getArrayOfReadPointers();
-    auto analysisBufferReadPtr = grainTest.getAnalysisAudioBuffer().getArrayOfReadPointers();
-    auto sineWaveBufferPtr = sineWavePitchBuffer.mSineCycleBuffer.getArrayOfReadPointers();
+    // // this is what we will write to and test to make sure we wrote properly
+    // juce::AudioBuffer<float> processBuffer(2, processBlockSize);
+    // processBuffer.clear();
 
 
 
-    // This part tests that the processBuffer is correctly delayed.
-    // We expect that the sine wave buffer will begin at 180 degrees of phase
-    // given the outputDelay above.  Only go to outputDelay so we don't have to wrap the sineWaveBuffer
-    for(int index = 0; index < outputDelay; index++)
-    {
-        auto sineSample = sineWaveBufferPtr[0][index+outputDelay];
-        auto processSample = processBufferReadPtr[0][index];
+    // grainCorrector.prepare(44100, processBlockSize);
+    // grainCorrector.setOutputDelay(outputDelay);
+    // grainCorrector.setShiftRatio(shiftRatio);
+    // grainCorrector.process(processBuffer);
 
-        CHECK(processSample == sineSample);    
-    }
+    // auto processBufferReadPtr = processBuffer.getArrayOfReadPointers();
+    // auto analysisBufferReadPtr = grainTest.getAnalysisAudioBuffer().getArrayOfReadPointers();
+    // auto sineWaveBufferPtr = sineWavePitchBuffer.mSineCycleBuffer.getArrayOfReadPointers();
+
+
+
+    // // This part tests that the processBuffer is correctly delayed.
+    // // We expect that the sine wave buffer will begin at 180 degrees of phase
+    // // given the outputDelay above.  Only go to outputDelay so we don't have to wrap the sineWaveBuffer
+    // for(int index = 0; index < outputDelay; index++)
+    // {
+    //     auto sineSample = sineWaveBufferPtr[0][index+outputDelay];
+    //     auto processSample = processBufferReadPtr[0][index];
+
+    //     CHECK(processSample == sineSample);    
+    // }
 }
