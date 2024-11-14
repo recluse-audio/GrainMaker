@@ -49,7 +49,7 @@ TEST_CASE("Can push and pop pitch and buffer.  This should create pitch marks")
      * 
      */
     int numSamples = 1024;
-    int numChannels = 1;
+    int numChannels = 2;
     juce::AudioBuffer<float> ioBuffer(numChannels, numSamples);
     juce::AudioBuffer<float> pitchBuffer(numChannels, numSamples);
 
@@ -67,6 +67,7 @@ TEST_CASE("Can push and pop pitch and buffer.  This should create pitch marks")
 
     // Now we can declare 
     PitchMarkedCircularBuffer circularBuffer;
+    circularBuffer.setSize(2, 88200);
 
     circularBuffer.pushBufferAndPeriod(ioBuffer, periodLength);
     circularBuffer.popBufferAndPitch(ioBuffer, pitchBuffer);
@@ -77,36 +78,39 @@ TEST_CASE("Can push and pop pitch and buffer.  This should create pitch marks")
 
     for(int sampleIndex = 0; sampleIndex < numSamples; sampleIndex++)
     {
-        auto pitchSample = pitchRead[0][sampleIndex];
+        auto markedPeriodLength = pitchRead[0][sampleIndex];
+        auto indexInPeriod = pitchRead[1][sampleIndex];
 
-        // TODO: remove this temp func
-        // if(pitchSample == periodLength)
-        //     CHECK(sampleIndex == 32);
+        // inverse of tests below, we can expect that sample index 32 will be the peak of a period
+        // therefore the value stored there should be the periodLength
+        if(markedPeriodLength == periodLength)
+            CHECK(indexInPeriod == 32);
 
+        // Known indices of peak sample values in test scenario
         if(sampleIndex == 32)
-            CHECK(pitchSample == periodLength);
+            CHECK(markedPeriodLength == periodLength);
         else if(sampleIndex == 161)
-            CHECK(pitchSample == periodLength);
+            CHECK(markedPeriodLength == periodLength);
         else if(sampleIndex == 290)
-            CHECK(pitchSample == periodLength); 
+            CHECK(markedPeriodLength == periodLength); 
         else if(sampleIndex == 419)
-            CHECK(pitchSample == periodLength);
+            CHECK(markedPeriodLength == periodLength);
         else if(sampleIndex == 548)
-            CHECK(pitchSample == periodLength);
+            CHECK(markedPeriodLength == periodLength);
         else if(sampleIndex == 677)
-            CHECK(pitchSample == periodLength); 
+            CHECK(markedPeriodLength == periodLength); 
         else if(sampleIndex == 806)
-            CHECK(pitchSample == periodLength); 
+            CHECK(markedPeriodLength == periodLength); 
         else if(sampleIndex == 935)
-            CHECK(pitchSample == periodLength); 
+            CHECK(markedPeriodLength == periodLength); 
         else
-            CHECK(pitchSample == 0.f);
+            CHECK(markedPeriodLength == 0.f);
 
     }
 
-    auto outputPath = BufferWriter::getTestOutputPath("PitchMarkBuffer.json");
-    juce::File pitchJson(outputPath);
-    BufferWriter::writeToJson(pitchBuffer, pitchJson);
+    // auto outputPath = BufferWriter::getTestOutputPath("PitchMarkBuffer.json");
+    // juce::File pitchJson(outputPath);
+    // BufferWriter::writeToJson(pitchBuffer, pitchJson);
 
 }
 

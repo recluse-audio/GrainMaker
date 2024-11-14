@@ -42,20 +42,65 @@ void GrainCorrector::process(juce::AudioBuffer<float>& processBuffer)
     // grab juce::AudioBlock's from mAnalysisAudioBuffer at pitch marks (grains)
     // add these grains to processBuffer at shifted positions
 
-    auto analysisReadPtr = mAnalysisAudioBuffer.getArrayOfReadPointers();
-    auto pitchMarkReadPtr = mAnalysisPitchMarksBuffer.getArrayOfReadPointers();
-    auto processBufferWritePtr = processBuffer.getArrayOfWritePointers();
+    // auto analysisReadPtr = mAnalysisAudioBuffer.getArrayOfReadPointers();
+    // auto pitchMarkReadPtr = mAnalysisPitchMarksBuffer.getArrayOfReadPointers();
+    // auto processBufferWritePtr = processBuffer.getArrayOfWritePointers();
 
-    for(int sampleIndex = 0; sampleIndex < processBuffer.getNumSamples(); sampleIndex++)
-    {
-        // TODO: What if circle buffer is not same num channels as processBuffer
-        for(int ch = 0; ch < processBuffer.getNumChannels(); ch++)
-        {
-            auto analysisSample = analysisReadPtr[ch][sampleIndex + mOutputDelay];
-            processBufferWritePtr[ch][sampleIndex] += analysisSample;
-        }
-    }
+    // // baseline copying from analysis buffer to processBuffer
+    // // we will overlay grains taken from mAnalysisAudioBuffer later
+    // for(int sampleIndex = 0; sampleIndex < processBuffer.getNumSamples(); sampleIndex++)
+    // {
+    //     // TODO: What if circle buffer is not same num channels as processBuffer
+    //     for(int ch = 0; ch < processBuffer.getNumChannels(); ch++)
+    //     {
+    //         auto analysisSample = analysisReadPtr[ch][sampleIndex + mOutputDelay];
+    //         processBufferWritePtr[ch][sampleIndex] += analysisSample;
+    //     }
+
+    // }
+
+    juce::dsp::AudioBlock<float> analysisBlock(mAnalysisAudioBuffer);
+    juce::dsp::AudioBlock<float> processBlock(processBuffer);
+
+    auto analysisSubBlock = analysisBlock.getSubBlock((size_t)mOutputDelay, processBlock.getNumSamples());
+    auto processSubBlock = processBlock.getSubBlock((size_t)0, processBlock.getNumSamples());
+
+    processSubBlock.add(analysisSubBlock);
+
+
+    // REFACTOR: Make this write to the processBuffer by grains taken at pitchMarks
+    // and still pass the tests!!!  Then delete this.
+
+    // now loop through mAnalysisAudioBuffer, take chunks of it
+    // find the grains at pitch marks
+    // make the grains one at a time using juce::AudioBlock and RD_DSP::Window
+    // write the 
+    // for(int sampleIndex = 0; sampleIndex < mAnalysisPitchMarksBuffer.getNumSamples(); sampleIndex++)
+    // {
+    //     auto storedPeriodLength = pitchMarkReadPtr[0][sampleIndex];
+    //     auto storedIndexInPeriod = pitchMarkReadPtr[1][sampleIndex];
+
+    //     // pitches are marked by storing detected period in samples at the peak magnitude of that presumed waveform
+    //     if(storedPeriodLength > 0.f)
+    //     {
+    //         int analysisStartIndex = sampleIndex - (storedPeriodLength / 2); // TODO: division at high rate of occurrence, eek!
+    //         int analysisEndIndex = analysisStartIndex + storedPeriodLength;
+
+    //         // juce::AudioBlock portion of the mAnalysisAudioBuffer that is one period of detected pitch in length.
+    //         // making a grain with this
+    //         auto pitchGrainBlock = analysisBlock.getSubBlock((size_t)analysisStartIndex, (size_t)analysisEndIndex);
+
+    //     }
+
+
+    // }
 }
+
+//==================
+// void GrainCorrector::_makeGrain()
+// {
+
+// }
 
 
 //==================
@@ -66,7 +111,7 @@ void GrainCorrector::_updateAnalysisSize()
     // going to have to make this maxBlockSize + mOutputDelay
     mAnalysisAudioBuffer.setSize(2, numAnalysisSamples);
     mAnalysisAudioBuffer.clear();
-    mAnalysisPitchMarksBuffer.setSize(1, numAnalysisSamples);
+    mAnalysisPitchMarksBuffer.setSize(2, numAnalysisSamples);
     mAnalysisPitchMarksBuffer.clear();
 }
 
