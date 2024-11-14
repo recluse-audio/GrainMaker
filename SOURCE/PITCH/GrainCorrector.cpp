@@ -61,11 +61,18 @@ void GrainCorrector::process(juce::AudioBuffer<float>& processBuffer)
 
     juce::dsp::AudioBlock<float> analysisBlock(mAnalysisAudioBuffer);
     juce::dsp::AudioBlock<float> processBlock(processBuffer);
+    int halfProcessBlock = processBlock.getNumSamples()/2;
 
-    auto analysisSubBlock = analysisBlock.getSubBlock((size_t)mOutputDelay, processBlock.getNumSamples());
-    auto processSubBlock = processBlock.getSubBlock((size_t)0, processBlock.getNumSamples());
+    auto analysisSubBlock1 = analysisBlock.getSubBlock((size_t)mOutputDelay, (size_t)halfProcessBlock);
+    auto analysisSubBlock2 = analysisBlock.getSubBlock((size_t)(mOutputDelay + halfProcessBlock), (size_t)halfProcessBlock);
 
-    processSubBlock.add(analysisSubBlock);
+
+    auto processSubBlock1 = processBlock.getSubBlock((size_t)0, (size_t)halfProcessBlock);
+    auto processSubBlock2 = processBlock.getSubBlock((size_t)halfProcessBlock, (size_t)halfProcessBlock );
+
+    processSubBlock1.add(analysisSubBlock1);
+    processSubBlock2.add(analysisSubBlock2);
+
 
 
     // REFACTOR: Make this write to the processBuffer by grains taken at pitchMarks
