@@ -1,4 +1,5 @@
 #include "GrainCorrector.h"
+#include "../SUBMODULES/RD/SOURCE/BufferMath.h"
 
 //=================
 GrainCorrector::GrainCorrector(PitchMarkedCircularBuffer& pitchMarkedBuffer)
@@ -35,6 +36,9 @@ void GrainCorrector::setOutputDelay(int outputDelay)
 void GrainCorrector::process(juce::AudioBuffer<float>& processBuffer)
 {
 
+    ////////////////////////////////
+    // ATTEMPT ONE 
+    ////////////////////////////////
     // Get audio block from 
     mPitchMarkedBuffer.popBufferAndPitch(mAnalysisAudioBuffer, mAnalysisPitchMarksBuffer);
 
@@ -59,30 +63,18 @@ void GrainCorrector::process(juce::AudioBuffer<float>& processBuffer)
 
     // }
 
-    juce::dsp::AudioBlock<float> analysisBlock(mAnalysisAudioBuffer);
-    juce::dsp::AudioBlock<float> processBlock(processBuffer);
-    int halfProcessBlock = processBlock.getNumSamples()/2;
 
-    auto analysisSubBlock1 = analysisBlock.getSubBlock((size_t)mOutputDelay, (size_t)halfProcessBlock);
-    auto analysisSubBlock2 = analysisBlock.getSubBlock((size_t)(mOutputDelay + halfProcessBlock), (size_t)halfProcessBlock);
-
-
-    auto processSubBlock1 = processBlock.getSubBlock((size_t)0, (size_t)halfProcessBlock);
-    auto processSubBlock2 = processBlock.getSubBlock((size_t)halfProcessBlock, (size_t)halfProcessBlock );
-
-    processSubBlock1.add(analysisSubBlock1);
-    processSubBlock2.add(analysisSubBlock2);
-
-
-
+    ////////////////////////////////
+    // ATTEMPT TWO - Use writePtrs to write sample by sample 
+    ////////////////////////////////
     // REFACTOR: Make this write to the processBuffer by grains taken at pitchMarks
     // and still pass the tests!!!  Then delete this.
 
-    // now loop through mAnalysisAudioBuffer, take chunks of it
+    // now loop through analysisBlock, take chunks of it
     // find the grains at pitch marks
     // make the grains one at a time using juce::AudioBlock and RD_DSP::Window
     // write the 
-    // for(int sampleIndex = 0; sampleIndex < mAnalysisPitchMarksBuffer.getNumSamples(); sampleIndex++)
+    // for(int sampleIndex = 0; sampleIndex < analysisBlock.getNumSamples(); sampleIndex++)
     // {
     //     auto storedPeriodLength = pitchMarkReadPtr[0][sampleIndex];
     //     auto storedIndexInPeriod = pitchMarkReadPtr[1][sampleIndex];
@@ -101,7 +93,122 @@ void GrainCorrector::process(juce::AudioBuffer<float>& processBuffer)
 
 
     // }
+
+
+    ////////////////////////////////
+    // ATTEMPT THREE - Use AudioBlocks, use subBlock for two pseudo grains
+    ////////////////////////////////
+    // juce::dsp::AudioBlock<float> analysisBlock(mAnalysisAudioBuffer);
+    // juce::dsp::AudioBlock<float> processBlock(processBuffer);
+
+    // int halfProcessBlock = processBlock.getNumSamples()/2;
+
+    // auto analysisSubBlock1 = analysisBlock.getSubBlock((size_t)mOutputDelay, (size_t)halfProcessBlock);
+    // auto analysisSubBlock2 = analysisBlock.getSubBlock((size_t)(mOutputDelay + halfProcessBlock), (size_t)halfProcessBlock);
+
+
+    // auto processSubBlock1 = processBlock.getSubBlock((size_t)0, (size_t)halfProcessBlock);
+    // auto processSubBlock2 = processBlock.getSubBlock((size_t)halfProcessBlock, (size_t)halfProcessBlock );
+
+    // processSubBlock1.add(analysisSubBlock1);
+    // processSubBlock2.add(analysisSubBlock2);
+
+
+
+
+    //////////////////////////////
+    // ATTEMPT FOUR - Make a subBlock at each pitch mark.  Make it the length of th evalue stored in the pitch buffer
+    //////////////////////////////
+    juce::dsp::AudioBlock<float> analysisBlock(mAnalysisAudioBuffer);
+    juce::dsp::AudioBlock<float> markedBlock(mAnalysisPitchMarksBuffer);
+    juce::dsp::AudioBlock<float> processBlock(processBuffer);
+
+    // helps keep code clean, account for -1 and starting at index [0]
+    int maxAnalysisIndex = analysisBlock.getNumSamples() - 1;
+    int maxProcessBlockIndex = processBlock.getNumSamples() - 1;
+
+    // loop analysisBlock 
+    for(int analysisIndex = 0; analysisIndex <= maxAnalysisIndex; analysisIndex++)
+    {
+        // this will be equal to detected period length at the max sample index of a periodic waveform
+        auto periodMarkerValue = markedBlock.getSample(0, analysisIndex);
+
+        if(periodMarkerValue > 0.f)
+        {
+            // window for grain starts 1/2 period length before marked index, and ends 1/2 period after
+            int halfPeriodLength = periodMarkerValue / 2;
+            int readStartIndex = analysisIndex - halfPeriodLength;
+            int readEndIndex = analysisIndex + halfPeriodLength;
+
+            // keep things in range
+            if( readStartIndex < 0 )
+                readStartIndex = 0;
+            if( readEndIndex > maxAnalysisIndex )
+                readEndIndex = maxAnalysisIndex;
+
+            int analysisSubBlockLength = readEndIndex - readStartIndex;
+            
+
+            // range to write to in processBlock.  Maybe out of range at this point, checks below
+            int writeStartIndex = readStartIndex - mOutputDelay;
+            int writeEndIndex = readEndIndex - mOutputDelay;
+
+            if(writeEndIndex < 0)
+                continue;
+
+            // keep things in range
+            if( writeStartIndex < 0 )
+                writeStartIndex = 0;
+            if( writeEndIndex > maxProcessBlockIndex )
+                writeEndIndex = maxProcessBlockIndex;
+
+            // might be less than zero if a pitch period is not at all going to the processBlock()
+            // "inside" the output delay
+            int writeLength = (writeEndIndex - writeStartIndex) + 1; // need a length of 1 for single index
+
+            // There is something to write to the processBlock
+            if(writeLength >= 1)
+            {
+                // readStartIndex needs to be mapped to processBlock's context i.e. factor in the mOutputDelay
+                auto analysisSubBlock = analysisBlock.getSubBlock(readStartIndex+mOutputDelay, writeLength);
+                auto processSubBlock = processBlock.getSubBlock(writeStartIndex, writeLength);
+                processSubBlock.add(analysisSubBlock);
+
+
+            }
+        }
+    }
+    
+
 }
+
+// //==================
+// juce::dsp::AudioBlock<float> _getAnalysisSubBlock(juce::dsp::AudioBlock<float> analysisBlock, int analysisIndex, int period)
+// {
+//     int maxAnalysisIndex = analysisBlock.getNumSamples() - 1;
+//     // window for grain starts 1/2 period length before marked index, and ends 1/2 period after
+//     int halfPeriodLength = period / 2;
+//     int readStartIndex = analysisIndex - halfPeriodLength;
+//     int readEndIndex = analysisIndex + halfPeriodLength;
+
+//     // keep things in range
+//     if( readStartIndex < 0 )
+//         readStartIndex = 0;
+//     if( readEndIndex > maxAnalysisIndex )
+//         readEndIndex = maxAnalysisIndex;
+
+//     int readLength = readEndIndex - readStartIndex;
+
+//     return analysisBlock.getSubBlock(readStartIndex, readLength)
+// }
+
+// //==================
+// juce::dsp::AudioBlock<float> GrainCorrector::_writeGrainToProcessBlock(juce::dsp::AudioBlock<float> processBlock, 
+//                                                                         juce::dsp::AudioBlock<float> analysisSubBlock )
+// {
+//     // make a subBlock of the range of the processBlock that is to be written to
+//     int delayedStart = analysisSubBlock.get
+// }
 
 //==================
 // void GrainCorrector::_makeGrain()
