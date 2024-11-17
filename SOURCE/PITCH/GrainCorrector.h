@@ -87,6 +87,13 @@ private:
     // prepare() or setOutputDelay() in either order
     void _updateAnalysisSize();
 
+    // after detecting a pitch period you call this to get the correct AudioBlock from mAnalysisAudioBuffer
+    // determines if values are in range before creating subBlock
+    juce::dsp::AudioBlock<float> _getAnalysisSubBlock(juce::dsp::AudioBlock<float> analysisBlock, int readStart, int readEnd);
+
+    // given an analysis grain, this determines the portion of the processBlock that is to be written tok
+    juce::dsp::AudioBlock<float> _writeGrainToProcessBlock(juce::dsp::AudioBlock<float> processBlock, juce::dsp::AudioBlock<float> analysisSubBlock);
+    
     // 
     void _makeGrain(juce::dsp::AudioBlock<float> readBlock, juce::dsp::AudioBlock<float> writeBlock);
 

@@ -135,7 +135,10 @@ TEST_CASE("Basic IO, no shift or correction.")
     {
         auto processBlockSample = processBlockReadPtr[0][blockIndex];
         auto sineSample = sineWaveReadPtr[0][blockIndex];
-
+        if(processBlockSample != sineSample)
+            CHECK(blockIndex < processBlock.getNumSamples());
+        if(processBlockSample == sineSample)
+            processBlockSample = sineSample;
         CHECK(processBlockSample == sineSample);
     }
 
