@@ -30,7 +30,7 @@
 // };
 
 //===============
-TEST_CASE("Can push and pop pitch and buffer.  This should create pitch marks")
+TEST_CASE("Can push and pop pitch and buffer")
 {
     /**
      * @brief Set up: This simulates passing in a buffer
@@ -48,36 +48,66 @@ TEST_CASE("Can push and pop pitch and buffer.  This should create pitch marks")
      * 
      * 
      */
-    int numSamples = 1024;
-    int numChannels = 2;
-    juce::AudioBuffer<float> ioBuffer(numChannels, numSamples);
-    juce::AudioBuffer<float> pitchBuffer(numChannels, numSamples);
 
-    ioBuffer.clear();
+        // Now we can declare 
+    PitchMarkedCircularBuffer circularBuffer;
+    int circularBufferSize = 1024;
+    circularBuffer.setSize(2, circularBufferSize);
+
+    auto expectedRule = PitchMarkedCircularBuffer::MarkingRule::kMagnitude;
+    circularBuffer.setMarkingRule(PitchMarkedCircularBuffer::MarkingRule::kMagnitude);
+    auto actualRule = circularBuffer.getMarkingRule();
+    CHECK(actualRule == expectedRule);
+
+
+    int numSamples = 128;
+    int numChannels = 2;
+    juce::AudioBuffer<float> sineBuffer(numChannels, numSamples);
+    juce::AudioBuffer<float> pitchBuffer(numChannels, numSamples);
+    juce::AudioBuffer<float> analysisBuffer(numChannels, numSamples);
+
+
+    sineBuffer.clear();
     pitchBuffer.clear();
 
-    int numCycles = 8; // we will expect this many pitch marks later
-    int periodLength = 1024 / numCycles; // 
+    int numCycles = 10; // we will expect this many pitch marks later
+    int periodLength = 128; // 
     // this just to make sure we passed audio data successfully
-    BufferFiller::generateSineCycles(ioBuffer, periodLength);
+    BufferFiller::generateSineCycles(sineBuffer, periodLength);
 
+    circularBuffer.prepare(44100, periodLength);
+
+    for(int i = 0; i < numCycles; i++)
+    {
+        circularBuffer.pushBufferAndPeriod(sineBuffer, periodLength);
+        int audioWritePos = 0;
+        int pitchMarkWritePos = 0;
+        circularBuffer.checkWritePos(audioWritePos, pitchMarkWritePos);
+
+        int expectedWritePos = periodLength * (i+1);
+        expectedWritePos %= circularBufferSize;
+        CHECK(audioWritePos == expectedWritePos);
+        CHECK(pitchMarkWritePos == expectedWritePos);
+        
+    }
     //
     // End Setup
     //
 
-    // Now we can declare 
-    PitchMarkedCircularBuffer circularBuffer;
-    circularBuffer.setSize(2, 88200);
 
-    circularBuffer.pushBufferAndPeriod(ioBuffer, periodLength);
-    circularBuffer.popBufferAndPitch(ioBuffer, pitchBuffer);
 
-    auto ioRead = ioBuffer.getArrayOfReadPointers();
+
+    circularBuffer.popBufferAndPitch(analysisBuffer, pitchBuffer);
+
+    auto sineRead = sineBuffer.getArrayOfReadPointers();
     auto pitchRead = pitchBuffer.getArrayOfReadPointers();
-    
+    auto analysisRead = analysisBuffer.getArrayOfReadPointers();
+
 
     for(int sampleIndex = 0; sampleIndex < numSamples; sampleIndex++)
     {
+        auto sineReadSample = sineRead[0][sampleIndex];
+
         auto markedPeriodLength = pitchRead[0][sampleIndex];
         auto indexInPeriod = pitchRead[1][sampleIndex];
 
