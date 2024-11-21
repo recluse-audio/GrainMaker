@@ -33,6 +33,12 @@ void GrainCorrector::setOutputDelay(int outputDelay)
 }
 
 //=================
+void GrainCorrector::setTransposeRatio(float newRatio)
+{
+    mTransposeRatio = newRatio;
+}
+
+//=================
 void GrainCorrector::process(juce::AudioBuffer<float>& processBuffer)
 {
 
@@ -148,17 +154,35 @@ void GrainCorrector::process(juce::AudioBuffer<float>& processBuffer)
 
             int analysisSubBlockLength = readEndIndex - readStartIndex;
             
+            int transposeOffset = (mTransposeRatio - 1.f) * (float)periodMarkerValue;
 
-            // range to write to in processBlock.  Maybe out of range at this point, checks below
-            int writeStartIndex = readStartIndex - mOutputDelay;
-            int writeEndIndex = readEndIndex - mOutputDelay;
+            // where the analysis block should go after transposition
+            int transposedStartIndex = readStartIndex + transposeOffset;
+            int transposedEndIndex = readEndIndex + transposeOffset;
 
-            if(writeEndIndex < 0)
+
+
+
+
+
+            // nothing will be written to processBlock b/c it is entirely in the look-a-head
+            if(transposedEndIndex < mOutputDelay)
                 continue;
 
             // keep things in range
-            if( writeStartIndex < 0 )
+
+            // Normalizes mAnalysisAudioBuffer with the processBuffer so that mAnalysisAudioBuffer[mOutputDelay] lines up with processBuffer[0]
+            int writeStartIndex = transposedStartIndex - mOutputDelay;
+            int writeEndIndex = transposedEndIndex - mOutputDelay;
+            
+            
+            /// DELETE TEST TEST TEST
+            maxProcessBlockIndex = 32;
+
+            if(writeStartIndex < 0)
+            {
                 writeStartIndex = 0;
+            }
             if( writeEndIndex > maxProcessBlockIndex )
                 writeEndIndex = maxProcessBlockIndex;
 
@@ -169,9 +193,30 @@ void GrainCorrector::process(juce::AudioBuffer<float>& processBuffer)
             // There is something to write to the processBlock
             if(writeLength >= 1)
             {
+                // only want to read range that will end up being written to processBlock
+                int trimmedReadSamples = (transposedStartIndex - mOutputDelay) * (-1.f);
+
+                if (trimmedReadSamples > 0)
+                    readStartIndex += trimmedReadSamples; //
+
+
+
+
+                // bool fullReadBlock = transposedStartIndex - mOutputDelay >= 0;
+
+                
+                if(readStartIndex != 224)
+                {
+                    DBG("TEST TEST TEST PitchMarkedCircularBuffer::process().");
+                    DBG(readStartIndex);
+                }
+
                 // readStartIndex needs to be mapped to processBlock's context i.e. factor in the mOutputDelay
-                auto analysisSubBlock = analysisBlock.getSubBlock(readStartIndex+mOutputDelay, writeLength);
+                auto analysisSubBlock = analysisBlock.getSubBlock(readStartIndex, writeLength);
                 auto processSubBlock = processBlock.getSubBlock(writeStartIndex, writeLength);
+                //processSubBlock.copyFrom(analysisSubBlock);
+                // auto analysisSubBlock = analysisBlock.getSubBlock(224, 32);
+                // auto processSubBlock = processBlock.getSubBlock(0, 32);
                 processSubBlock.add(analysisSubBlock);
 
 

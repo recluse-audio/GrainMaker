@@ -48,6 +48,13 @@ public:
      */
     void setOutputDelay(int outputDelay);
 
+    /**
+     * @brief Set the Transpose Ratio object
+     * 
+     * @param newRatio 
+     */
+    void setTransposeRatio(float newRatio);
+
     ////////////////
     /**
      * 
