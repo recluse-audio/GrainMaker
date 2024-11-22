@@ -41,86 +41,7 @@ void GrainCorrector::setTransposeRatio(float newRatio)
 //=================
 void GrainCorrector::process(juce::AudioBuffer<float>& processBuffer)
 {
-
-    ////////////////////////////////
-    // ATTEMPT ONE 
-    ////////////////////////////////
-    // Get audio block from 
     mPitchMarkedBuffer.popBufferAndPitch(mAnalysisAudioBuffer, mAnalysisPitchMarksBuffer);
-
-    // copy section of audio data buffer to processBuffer 
-    // grab juce::AudioBlock's from mAnalysisAudioBuffer at pitch marks (grains)
-    // add these grains to processBuffer at shifted positions
-
-    // auto analysisReadPtr = mAnalysisAudioBuffer.getArrayOfReadPointers();
-    // auto pitchMarkReadPtr = mAnalysisPitchMarksBuffer.getArrayOfReadPointers();
-    // auto processBufferWritePtr = processBuffer.getArrayOfWritePointers();
-
-    // // baseline copying from analysis buffer to processBuffer
-    // // we will overlay grains taken from mAnalysisAudioBuffer later
-    // for(int sampleIndex = 0; sampleIndex < processBuffer.getNumSamples(); sampleIndex++)
-    // {
-    //     // TODO: What if circle buffer is not same num channels as processBuffer
-    //     for(int ch = 0; ch < processBuffer.getNumChannels(); ch++)
-    //     {
-    //         auto analysisSample = analysisReadPtr[ch][sampleIndex + mOutputDelay];
-    //         processBufferWritePtr[ch][sampleIndex] += analysisSample;
-    //     }
-
-    // }
-
-
-    ////////////////////////////////
-    // ATTEMPT TWO - Use writePtrs to write sample by sample 
-    ////////////////////////////////
-    // REFACTOR: Make this write to the processBuffer by grains taken at pitchMarks
-    // and still pass the tests!!!  Then delete this.
-
-    // now loop through analysisBlock, take chunks of it
-    // find the grains at pitch marks
-    // make the grains one at a time using juce::AudioBlock and RD_DSP::Window
-    // write the 
-    // for(int sampleIndex = 0; sampleIndex < analysisBlock.getNumSamples(); sampleIndex++)
-    // {
-    //     auto storedPeriodLength = pitchMarkReadPtr[0][sampleIndex];
-    //     auto storedIndexInPeriod = pitchMarkReadPtr[1][sampleIndex];
-
-    //     // pitches are marked by storing detected period in samples at the peak magnitude of that presumed waveform
-    //     if(storedPeriodLength > 0.f)
-    //     {
-    //         int analysisStartIndex = sampleIndex - (storedPeriodLength / 2); // TODO: division at high rate of occurrence, eek!
-    //         int analysisEndIndex = analysisStartIndex + storedPeriodLength;
-
-    //         // juce::AudioBlock portion of the mAnalysisAudioBuffer that is one period of detected pitch in length.
-    //         // making a grain with this
-    //         auto pitchGrainBlock = analysisBlock.getSubBlock((size_t)analysisStartIndex, (size_t)analysisEndIndex);
-
-    //     }
-
-
-    // }
-
-
-    ////////////////////////////////
-    // ATTEMPT THREE - Use AudioBlocks, use subBlock for two pseudo grains
-    ////////////////////////////////
-    // juce::dsp::AudioBlock<float> analysisBlock(mAnalysisAudioBuffer);
-    // juce::dsp::AudioBlock<float> processBlock(processBuffer);
-
-    // int halfProcessBlock = processBlock.getNumSamples()/2;
-
-    // auto analysisSubBlock1 = analysisBlock.getSubBlock((size_t)mOutputDelay, (size_t)halfProcessBlock);
-    // auto analysisSubBlock2 = analysisBlock.getSubBlock((size_t)(mOutputDelay + halfProcessBlock), (size_t)halfProcessBlock);
-
-
-    // auto processSubBlock1 = processBlock.getSubBlock((size_t)0, (size_t)halfProcessBlock);
-    // auto processSubBlock2 = processBlock.getSubBlock((size_t)halfProcessBlock, (size_t)halfProcessBlock );
-
-    // processSubBlock1.add(analysisSubBlock1);
-    // processSubBlock2.add(analysisSubBlock2);
-
-
-
 
     //////////////////////////////
     // ATTEMPT FOUR - Make a subBlock at each pitch mark.  Make it the length of th evalue stored in the pitch buffer
@@ -141,10 +62,8 @@ void GrainCorrector::process(juce::AudioBuffer<float>& processBuffer)
 
         if(periodMarkerValue > 0.f)
         {
-            // window for grain starts 1/2 period length before marked index, and ends 1/2 period after
-            int halfPeriodLength = periodMarkerValue / 2;
-            int readStartIndex = analysisIndex - halfPeriodLength;
-            int readEndIndex = analysisIndex + halfPeriodLength;
+            int readStartIndex = analysisIndex;
+            int readEndIndex = analysisIndex + periodMarkerValue;
 
             // keep things in range
             if( readStartIndex < 0 )
@@ -156,6 +75,8 @@ void GrainCorrector::process(juce::AudioBuffer<float>& processBuffer)
             
             int transposeOffset = (mTransposeRatio - 1.f) * (float)periodMarkerValue;
 
+            if(transposeOffset == 0)
+                DBG("zero offset");
             // where the analysis block should go after transposition
             int transposedStartIndex = readStartIndex + transposeOffset;
             int transposedEndIndex = readEndIndex + transposeOffset;
@@ -175,9 +96,6 @@ void GrainCorrector::process(juce::AudioBuffer<float>& processBuffer)
             int writeStartIndex = transposedStartIndex - mOutputDelay;
             int writeEndIndex = transposedEndIndex - mOutputDelay;
             
-            
-            /// DELETE TEST TEST TEST
-            maxProcessBlockIndex = 32;
 
             if(writeStartIndex < 0)
             {
@@ -199,17 +117,6 @@ void GrainCorrector::process(juce::AudioBuffer<float>& processBuffer)
                 if (trimmedReadSamples > 0)
                     readStartIndex += trimmedReadSamples; //
 
-
-
-
-                // bool fullReadBlock = transposedStartIndex - mOutputDelay >= 0;
-
-                
-                if(readStartIndex != 224)
-                {
-                    DBG("TEST TEST TEST PitchMarkedCircularBuffer::process().");
-                    DBG(readStartIndex);
-                }
 
                 // readStartIndex needs to be mapped to processBlock's context i.e. factor in the mOutputDelay
                 auto analysisSubBlock = analysisBlock.getSubBlock(readStartIndex, writeLength);
