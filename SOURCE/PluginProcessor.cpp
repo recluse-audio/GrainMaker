@@ -1,27 +1,26 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 #include "PITCH/PitchDetector.h"
-#include "../SUBMODULES/RD/SOURCE/CircularBuffer.h"
+#include "PITCH/PitchMarkedCircularBuffer.h"
+#include "PITCH/GrainCorrector.h"
 
 //==============================================================================
 PluginProcessor::PluginProcessor()
-     : AudioProcessor (BusesProperties()
-                     #if ! JucePlugin_IsMidiEffect
-                      #if ! JucePlugin_IsSynth
-                       .withInput  ("Input",  juce::AudioChannelSet::stereo(), true)
-                      #endif
-                       .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
-                     #endif
-                       )
+: AudioProcessor (_getBusesProperties())
+, apvts(*this, nullptr, "Parameters", _createParameterLayout())
 {
     mPitchDetector = std::make_unique<PitchDetector>();
-    mCircularBuffer = std::make_unique<CircularBuffer>();
+    mCircularBuffer = std::make_unique<PitchMarkedCircularBuffer>();
+    mGrainCorrector = std::make_unique<GrainCorrector>(*mCircularBuffer.get());
 }
 
+//=================================
+//
 PluginProcessor::~PluginProcessor()
 {
     mPitchDetector.reset();
     mCircularBuffer.reset();
+    mGrainCorrector.reset();
 }
 
 //==============================================================================
@@ -93,7 +92,9 @@ void PluginProcessor::changeProgramName (int index, const juce::String& newName)
 void PluginProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
     mPitchDetector->prepareToPlay(sampleRate, samplesPerBlock);
+    mCircularBuffer->prepare(sampleRate, samplesPerBlock);
     mCircularBuffer->setSize(this->getNumOutputChannels(), (int)sampleRate); // by default 1 second
+    mGrainCorrector->prepare(sampleRate, samplesPerBlock);
 }
 
 void PluginProcessor::releaseResources()
@@ -133,11 +134,10 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     auto totalNumInputChannels  = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
 
-    float pitch = mPitchDetector->process(buffer);
+    float period = mPitchDetector->process(buffer);
 
-    mCircularBuffer->pushBuffer(buffer);
-    buffer.clear(); // TESTTESTTEST clearing buffer to make sure it is only successfully refilled in the popBuffer function
-    mCircularBuffer->popBuffer(buffer);
+    mCircularBuffer->pushBufferAndPeriod(buffer, period);
+    mGrainCorrector->process(buffer);
     // buffer.applyGain(0.f);
 }
 
@@ -183,4 +183,52 @@ const float PluginProcessor::getLastDetectedPitch()
 {
     float pitch = this->getSampleRate() / mPitchDetector->getCurrentPeriod();
     return pitch;
+}
+
+//===============================================================================
+//
+juce::AudioProcessorValueTreeState& PluginProcessor::getAPVTS()
+{
+    return apvts;
+}
+
+//===============================================================================
+//
+void PluginProcessor::parameterChanged(const juce::String& parameterID, float newValue)
+{
+    if(parameterID == "shift ratio")
+    {
+        mGrainCorrector->setTransposeRatio(newValue);
+    }
+}
+
+//==================================
+// PRIVATE
+//==================================
+
+//===================
+//
+juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::_createParameterLayout()
+{
+    std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
+
+    // Add a gain parameter as an example
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "shift ratio",         // Parameter ID
+        "Shift Ratio",         // Parameter name
+        0.5,           // Min value
+        1.5f,           // Max value
+        1.f));         // Default value
+
+    return { params.begin(), params.end() };
+}
+
+
+//====================
+//
+juce::AudioProcessor::BusesProperties PluginProcessor::_getBusesProperties()
+{
+    return BusesProperties()
+                .withInput("Input", juce::AudioChannelSet::stereo(), true)
+                .withOutput("Output", juce::AudioChannelSet::stereo(), true);
 }

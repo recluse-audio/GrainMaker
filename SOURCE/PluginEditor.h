@@ -21,5 +21,9 @@ private:
 
     std::unique_ptr<juce::Label> mPitchDisplay;
 
+    std::unique_ptr<juce::Slider> mPitchShiftSlider;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> mPitchShiftAttachment;
+
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PluginEditor)
 };

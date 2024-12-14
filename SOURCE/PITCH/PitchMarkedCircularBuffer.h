@@ -1,3 +1,4 @@
+#pragma once
 #include "UTIL/Juce_Header.h"
 #include "../SUBMODULES/RD/SOURCE/CircularBuffer.h"
 

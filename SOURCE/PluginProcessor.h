@@ -3,13 +3,15 @@
 #include "Util/Juce_Header.h"
 
 class PitchDetector;
-class CircularBuffer;
+class PitchMarkedCircularBuffer;
+class GrainCorrector;
 
 #if (MSVC)
 #include "ipps.h"
 #endif
 
 class PluginProcessor : public juce::AudioProcessor
+                      , public juce::AudioProcessorValueTreeState::Listener
 {
 public:
     PluginProcessor();
@@ -43,9 +45,20 @@ public:
 	
 	//===================================
     const float getLastDetectedPitch();
+
+    juce::AudioProcessorValueTreeState& getAPVTS();
+
+   // AudioProcessorValueTreeState::Listener callback
+    void parameterChanged(const juce::String& parameterID, float newValue) override;
+
 private:
     std::unique_ptr<PitchDetector> mPitchDetector;
-    std::unique_ptr<CircularBuffer> mCircularBuffer;
+    std::unique_ptr<PitchMarkedCircularBuffer> mCircularBuffer;
+    std::unique_ptr<GrainCorrector> mGrainCorrector;
 	
+    juce::AudioProcessorValueTreeState apvts;
+    juce::AudioProcessorValueTreeState::ParameterLayout _createParameterLayout();
+    // cleanup ugly code in PluginProcessor's constructor
+    juce::AudioProcessor::BusesProperties _getBusesProperties();
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PluginProcessor)
 };

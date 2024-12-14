@@ -8,7 +8,7 @@
  * @copyright Copyright (c) 2024
  * 
  */
-
+#pragma once
 #include "UTIL/Juce_Header.h"
 #include "../SUBMODULES/RD/SOURCE/Window.h"
 #include "PitchMarkedCircularBuffer.h"
