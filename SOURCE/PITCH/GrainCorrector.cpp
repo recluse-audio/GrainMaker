@@ -82,10 +82,6 @@ void GrainCorrector::process(juce::AudioBuffer<float>& processBuffer)
             int transposedEndIndex = readEndIndex + transposeOffset;
 
 
-
-
-
-
             // nothing will be written to processBlock b/c it is entirely in the look-a-head
             if(transposedEndIndex < mOutputDelay)
                 continue;
