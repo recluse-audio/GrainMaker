@@ -1,8 +1,11 @@
 set(TESTS
+    SUBMODULES/RD/TESTS/test_AudioFileHelpers.cpp
+    SUBMODULES/RD/TESTS/test_AudioFileProcessor.cpp
     SUBMODULES/RD/TESTS/test_BufferFiller.cpp
     SUBMODULES/RD/TESTS/test_BufferMath.cpp
     SUBMODULES/RD/TESTS/test_BufferWriter.cpp
     SUBMODULES/RD/TESTS/test_CircularBuffer.cpp
+    SUBMODULES/RD/TESTS/test_RelativeFilePath.cpp
     SUBMODULES/RD/TESTS/test_Windowing.cpp
     SUBMODULES/RD/TESTS/tests_Interpolator.cpp
     TESTS/TEST_UTILS/BufferGenerator.h

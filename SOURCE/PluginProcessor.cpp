@@ -95,6 +95,7 @@ void PluginProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     mCircularBuffer->prepare(sampleRate, samplesPerBlock);
     mCircularBuffer->setSize(this->getNumOutputChannels(), (int)sampleRate); // by default 1 second
     mGrainCorrector->prepare(sampleRate, samplesPerBlock);
+    mGrainCorrector->setOutputDelay(128);
 }
 
 void PluginProcessor::releaseResources()
