@@ -2,6 +2,7 @@ set(TESTS
     SUBMODULES/RD/TESTS/test_AudioFileHelpers.cpp
     SUBMODULES/RD/TESTS/test_AudioFileProcessor.cpp
     SUBMODULES/RD/TESTS/test_BufferFiller.cpp
+    SUBMODULES/RD/TESTS/test_BufferHelper.cpp
     SUBMODULES/RD/TESTS/test_BufferMath.cpp
     SUBMODULES/RD/TESTS/test_BufferWriter.cpp
     SUBMODULES/RD/TESTS/test_CircularBuffer.cpp
