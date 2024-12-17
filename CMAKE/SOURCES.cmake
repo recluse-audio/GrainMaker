@@ -14,12 +14,16 @@ set(SOURCES
     SOURCE/PluginProcessor.cpp
     SOURCE/PluginProcessor.h
     SOURCE/Util/Juce_Header.h
+    SUBMODULES/RD/SOURCE/AudioFileHelpers.h
+    SUBMODULES/RD/SOURCE/AudioFileProcessor.cpp
+    SUBMODULES/RD/SOURCE/AudioFileProcessor.h
     SUBMODULES/RD/SOURCE/BufferFiller.h
     SUBMODULES/RD/SOURCE/BufferMath.h
     SUBMODULES/RD/SOURCE/BufferWriter.h
     SUBMODULES/RD/SOURCE/CircularBuffer.cpp
     SUBMODULES/RD/SOURCE/CircularBuffer.h
     SUBMODULES/RD/SOURCE/Interpolator.h
+    SUBMODULES/RD/SOURCE/RelativeFilePath.h
     SUBMODULES/RD/SOURCE/Window.cpp
     SUBMODULES/RD/SOURCE/Window.h
 )
