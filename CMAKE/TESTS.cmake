@@ -16,4 +16,5 @@ set(TESTS
     TESTS/test_PitchDetector.cpp
     TESTS/test_PitchMarkedCircularBuffer.cpp
     TESTS/test_PluginBasics.cpp
+    TESTS/test_ProcessAudioFile.cpp
 )
