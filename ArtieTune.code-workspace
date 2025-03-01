@@ -108,7 +108,9 @@
 			"numeric": "cpp",
 			"random": "cpp",
 			"algorithm": "cpp",
-			"*.mm": "cpp"
+			"*.mm": "cpp",
+			"__memory": "cpp",
+			"filesystem": "cpp"
 		}
 	}
 }
