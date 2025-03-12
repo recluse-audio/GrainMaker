@@ -1,4 +1,7 @@
 set(TESTS
+    SUBMODULES/RD/TESTS/TEST_UTILS/BufferGenerator.h
+    SUBMODULES/RD/TESTS/TEST_UTILS/TestUtils.cpp
+    SUBMODULES/RD/TESTS/TEST_UTILS/TestUtils.h
     SUBMODULES/RD/TESTS/test_AudioFileHelpers.cpp
     SUBMODULES/RD/TESTS/test_AudioFileProcessor.cpp
     SUBMODULES/RD/TESTS/test_BufferFiller.cpp
@@ -13,6 +16,7 @@ set(TESTS
     TESTS/TEST_UTILS/TestUtils.cpp
     TESTS/TEST_UTILS/TestUtils.h
     TESTS/test_GrainCorrector.cpp
+    TESTS/test_Granulator.cpp
     TESTS/test_PitchDetector.cpp
     TESTS/test_PitchMarkedCircularBuffer.cpp
     TESTS/test_PluginBasics.cpp
