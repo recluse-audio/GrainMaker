@@ -41,6 +41,9 @@ void GrainCorrector::setTransposeRatio(float newRatio)
 //=================
 void GrainCorrector::process(juce::AudioBuffer<float>& processBuffer)
 {
+    mAnalysisAudioBuffer.clear();
+    mAnalysisPitchMarksBuffer.clear();
+
     mPitchMarkedBuffer.popBufferAndPitch(mAnalysisAudioBuffer, mAnalysisPitchMarksBuffer);
 
     //////////////////////////////

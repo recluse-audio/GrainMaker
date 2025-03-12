@@ -7,6 +7,8 @@ PitchMarkedCircularBuffer::PitchMarkedCircularBuffer()
 {
     setSize(2, 88200);
     mMarkingRule = PitchMarkedCircularBuffer::MarkingRule::kNone;
+    mAudioBuffer.setDelay(512);
+    mPitchBuffer.setDelay(512);
 }
 
 
@@ -39,6 +41,7 @@ bool PitchMarkedCircularBuffer::pushBufferAndPeriod(juce::AudioBuffer<float>& bu
     mAudioBuffer.pushBuffer(buffer);
 
     // mark this up according to buffer's audio data
+    mMarkingBuffer.setSize(buffer.getNumChannels(), buffer.getNumSamples());
     mMarkingBuffer.clear();
 
     auto audioBlock = juce::dsp::AudioBlock<float>(buffer);
@@ -100,7 +103,7 @@ void PitchMarkedCircularBuffer::_pitchMarkBlock(juce::dsp::AudioBlock<float> aud
         if(mMarkingRule == MarkingRule::kMagnitude)
         {
             int offsetInPeriod = BufferMath::getMaxSampleIndex(audioSubBlock, 0);
-            startInPeriod += offsetInPeriod;
+            startInPeriod = offsetInPeriod;
         }    
 
         markingSubBlock.setSample(0, startInPeriod, (float)period);
