@@ -5,6 +5,7 @@
 class PitchDetector;
 class PitchMarkedCircularBuffer;
 class GrainCorrector;
+class CircularBuffer;
 
 #if (MSVC)
 #include "ipps.h"
@@ -53,8 +54,9 @@ public:
 
 private:
     std::unique_ptr<PitchDetector> mPitchDetector;
-    std::unique_ptr<PitchMarkedCircularBuffer> mCircularBuffer;
+    std::unique_ptr<PitchMarkedCircularBuffer> mPMCBuffer;
     std::unique_ptr<GrainCorrector> mGrainCorrector;
+    std::unique_ptr<CircularBuffer> mCircularBuffer;
 	
     juce::AudioProcessorValueTreeState apvts;
     juce::AudioProcessorValueTreeState::ParameterLayout _createParameterLayout();

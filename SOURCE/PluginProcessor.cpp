@@ -10,8 +10,10 @@ PluginProcessor::PluginProcessor()
 , apvts(*this, nullptr, "Parameters", _createParameterLayout())
 {
     mPitchDetector = std::make_unique<PitchDetector>();
-    mCircularBuffer = std::make_unique<PitchMarkedCircularBuffer>();
-    mGrainCorrector = std::make_unique<GrainCorrector>(*mCircularBuffer.get());
+    mPMCBuffer = std::make_unique<PitchMarkedCircularBuffer>();
+    mGrainCorrector = std::make_unique<GrainCorrector>(*mPMCBuffer.get());
+    mCircularBuffer = std::make_unique<CircularBuffer>();
+
 }
 
 //=================================
@@ -19,8 +21,9 @@ PluginProcessor::PluginProcessor()
 PluginProcessor::~PluginProcessor()
 {
     mPitchDetector.reset();
-    mCircularBuffer.reset();
+    mPMCBuffer.reset();
     mGrainCorrector.reset();
+    mCircularBuffer.reset();
 }
 
 //==============================================================================
@@ -92,10 +95,13 @@ void PluginProcessor::changeProgramName (int index, const juce::String& newName)
 void PluginProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
     mPitchDetector->prepareToPlay(sampleRate, samplesPerBlock);
-    mCircularBuffer->prepare(sampleRate, samplesPerBlock);
-    mCircularBuffer->setSize(this->getNumOutputChannels(), (int)sampleRate); // by default 1 second
+    mPMCBuffer->prepare(sampleRate, samplesPerBlock);
+    mPMCBuffer->setSize(this->getNumOutputChannels(), (int)sampleRate); // by default 1 second
     mGrainCorrector->prepare(sampleRate, samplesPerBlock);
     mGrainCorrector->setOutputDelay(128);
+
+    mCircularBuffer->setSize(this->getNumOutputChannels(), (int)sampleRate * 2); // by default 1 second
+    mCircularBuffer->setDelay(sampleRate / 2);
 }
 
 void PluginProcessor::releaseResources()
@@ -135,10 +141,12 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     auto totalNumInputChannels  = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
 
-    float period = mPitchDetector->process(buffer);
+    mCircularBuffer->pushBuffer(buffer);
+    mCircularBuffer->popBuffer(buffer);
+    // float detected_period = mPitchDetector->process(buffer);
 
-    mCircularBuffer->pushBufferAndPeriod(buffer, period);
-    mGrainCorrector->process(buffer);
+    // mPMCBuffer->pushBufferAndPeriod(buffer, detected_period);
+    // mGrainCorrector->process(buffer);
     // buffer.applyGain(0.f);
 }
 
