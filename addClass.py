@@ -89,3 +89,11 @@ TEST_CASE("{class_name} Test", "[{class_name}]")
 
 if __name__ == "__main__":
     main()
+
+
+
+#################
+### USAGE
+###
+# python3 addClass.py effects/layer2/coolguy EffectClass 
+# allows class creation in nested directories.  Assumes there is a TESTS and SOURCE directory and being called from root of repo.

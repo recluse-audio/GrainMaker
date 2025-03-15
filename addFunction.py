@@ -77,3 +77,11 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
+#############
+### USAGE ###
+# ryandevens@Ryans-iMac ArtieTune % python3 addFunction.py Granulator "void prepare()"                                                                           
+# Class must exist in file.
+# TODO: Doesn't work with files in subdirectories of SOURCE yet
