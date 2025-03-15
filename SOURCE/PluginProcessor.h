@@ -6,6 +6,7 @@ class PitchDetector;
 class PitchMarkedCircularBuffer;
 class GrainCorrector;
 class CircularBuffer;
+class Granulator;
 
 #if (MSVC)
 #include "ipps.h"
@@ -57,7 +58,8 @@ private:
     std::unique_ptr<PitchMarkedCircularBuffer> mPMCBuffer;
     std::unique_ptr<GrainCorrector> mGrainCorrector;
     std::unique_ptr<CircularBuffer> mCircularBuffer;
-	
+    std::unique_ptr<Granulator> mGranulator;
+
     juce::AudioProcessorValueTreeState apvts;
     juce::AudioProcessorValueTreeState::ParameterLayout _createParameterLayout();
     // cleanup ugly code in PluginProcessor's constructor

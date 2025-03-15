@@ -3,6 +3,7 @@
 #include "PITCH/PitchDetector.h"
 #include "PITCH/PitchMarkedCircularBuffer.h"
 #include "PITCH/GrainCorrector.h"
+#include "Granulator.h"
 
 //==============================================================================
 PluginProcessor::PluginProcessor()
@@ -13,6 +14,7 @@ PluginProcessor::PluginProcessor()
     mPMCBuffer = std::make_unique<PitchMarkedCircularBuffer>();
     mGrainCorrector = std::make_unique<GrainCorrector>(*mPMCBuffer.get());
     mCircularBuffer = std::make_unique<CircularBuffer>();
+    mGranulator = std::make_unique<Granulator>();
 
 }
 
@@ -24,6 +26,7 @@ PluginProcessor::~PluginProcessor()
     mPMCBuffer.reset();
     mGrainCorrector.reset();
     mCircularBuffer.reset();
+    mGranulator.reset();
 }
 
 //==============================================================================
@@ -102,6 +105,10 @@ void PluginProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 
     mCircularBuffer->setSize(this->getNumOutputChannels(), (int)sampleRate * 2); // by default 1 second
     mCircularBuffer->setDelay(sampleRate / 2);
+
+    mGranulator->prepare(sampleRate);
+    mGranulator->setEmissionRateInHz(1);
+    mGranulator->setGrainLengthInMs(500);
 }
 
 void PluginProcessor::releaseResources()
@@ -143,6 +150,8 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
     mCircularBuffer->pushBuffer(buffer);
     mCircularBuffer->popBuffer(buffer);
+
+    mGranulator->process(buffer);
     // float detected_period = mPitchDetector->process(buffer);
 
     // mPMCBuffer->pushBufferAndPeriod(buffer, detected_period);
