@@ -107,8 +107,8 @@ void PluginProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     mCircularBuffer->setDelay(sampleRate / 2);
 
     mGranulator->prepare(sampleRate);
-    mGranulator->setEmissionRateInHz(1);
-    mGranulator->setGrainLengthInMs(500);
+    mGranulator->setEmissionRateInHz(20);
+    mGranulator->setGrainLengthInMs(25);
 }
 
 void PluginProcessor::releaseResources()

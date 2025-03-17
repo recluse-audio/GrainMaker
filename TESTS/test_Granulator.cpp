@@ -82,3 +82,81 @@ TEST_CASE("Can process buffer with no window")
         CHECK(sample == 0.f);
     }
 }
+
+
+
+
+//======================
+TEST_CASE("Can granulate buffer with no window into multiple grains")
+{
+    double sampleRate = 48000.0;  // redundant local val, but expecting values below that depend on 48k
+    juce::AudioBuffer<float> buffer(1, sampleRate);
+    BufferFiller::fillWithAllOnes(buffer);
+
+    Granulator granulator;
+    granulator.prepare(sampleRate);
+    // 10 emiisions/sec, each grain is half length
+    granulator.setEmissionRateInHz(10);
+    granulator.setGrainLengthInMs(50);
+
+    granulator.process(buffer);
+
+    int grainNumSamples = granulator.getGrainLengthInSamples();
+    int emissionNumSamples = granulator.getEmissionPeriodInSamples();
+
+    for(int sampleIndex = 0; sampleIndex < sampleRate; sampleIndex++)
+    {
+        auto sample = buffer.getSample(0, sampleIndex);
+
+        // if(sampleIndex < grainNumSamples)
+        //     CHECK(sample == 1.f);
+        // else if(sampleIndex >= grainNumSamples && sampleIndex < emissionNumSamples)
+        //     CHECK(sample == 0.f);
+
+
+        // throwing in some by hand expected values.  This applies to 48k only.
+        // jumping around to locations I know should have grains or should be silent.
+        if(sampleIndex < 2400)
+            CHECK(sample == 1.f);
+        else if(sampleIndex >= 2400 && sampleIndex < 4799)
+            CHECK(sample == 0.f);
+        else if(sampleIndex >= 19200 && sampleIndex < 21599)
+            CHECK(sample == 1.f);
+        else if(sampleIndex >= 21600 && sampleIndex < 23999)
+            CHECK(sample == 0.f);
+        else if(sampleIndex >= 43200 && sampleIndex < 45599)
+            CHECK(sample == 1.f);
+        else if(sampleIndex >= 45600 && sampleIndex < 45599)
+            CHECK(sample == 0.f);
+    }
+
+
+}
+
+
+
+//======================
+TEST_CASE("Can process buffer with hanning window")
+{
+    // juce::AudioBuffer<float> buffer(1, kDefaultSampleRate);
+    // BufferFiller::fillWithAllOnes(buffer);
+
+    // Granulator granulator;
+    // granulator.prepare(kDefaultSampleRate);
+    // granulator.setEmissionRateInHz(1);
+    // granulator.setGrainLengthInMs(500);
+
+    // granulator.process(buffer);
+
+    // for(int sampleIndex = 0; sampleIndex < (kDefaultSampleRate * 0.5); sampleIndex++)
+    // {
+    //     auto sample = buffer.getSample(0, sampleIndex);
+    //     CHECK(sample == 1.f);
+    // }
+
+    // for(int sampleIndex = (kDefaultSampleRate * 0.5); sampleIndex < kDefaultSampleRate; sampleIndex++)
+    // {
+    //     auto sample = buffer.getSample(0, sampleIndex);
+    //     CHECK(sample == 0.f);
+    // }
+}
