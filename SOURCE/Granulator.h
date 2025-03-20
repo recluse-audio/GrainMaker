@@ -12,7 +12,7 @@
 
  #pragma once
  #include "Util/Juce_Header.h"
-
+#include "../SUBMODULES/RD/SOURCE/Window.h"
 
  /**
   * @brief You pump in audio to this class, it chops it up into grains.
@@ -28,18 +28,24 @@ public:
     Granulator();
     ~Granulator();
 
+
+    void setGrainShape(Window::Shape newShape);
+
     void prepare(double sampleRate);
     const double getCurrentSampleRate();
 
     void setGrainLengthInMs(double lengthInMs);
+    void setGrainLengthInSamples(int numSamples);
     const int getGrainLengthInSamples();
 
     void setEmissionRateInHz(double rateInHz);
+    void setEmissionPeriodInSamples(int numSamples);
     const int getEmissionPeriodInSamples();
 
     void process(juce::AudioBuffer<float>& buffer);
 private:
     double mSampleRate = -1;
+    Window mWindow;
 
     int mGrainLengthInSamples = -1; // length of audio segment being windowed
     /**
@@ -50,11 +56,10 @@ private:
      * 
      */
     int mEmissionPeriodInSamples = -1; // length between one grain emission and the next.  
-    int mEmissionRateInHz = -1; // using this for now so a change of samplerate can maintain the emission rate, redundant with mEmissionPeriodInSamples though
 
     int mCurrentPhaseIndex = 0; // Index within grain emission
     void _incrementPhase();
-    
-    // Called when emission rate or sample rate change, potentially more occasions
-    void _updateEmissionPeriod();
+
+
+
 };
