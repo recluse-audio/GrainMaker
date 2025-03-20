@@ -1,12 +1,12 @@
 #include "Granulator.h"
-
+#include "../SUBMODULES/RD/SOURCE/Window.h"
 
 
 
 //
 Granulator::Granulator()
 {
-
+    mWindow.setShape(Window::Shape::kNone);
 }
 
 //
@@ -18,8 +18,21 @@ Granulator::~Granulator()
 //
 void Granulator::prepare(double sampleRate)
 {
-    mSampleRate = sampleRate;
-    _updateEmissionPeriod();
+    if(sampleRate != mSampleRate)
+    {
+        // don't divide by zero
+        if(mSampleRate > 0)
+        {
+            // re-calc the grain period based on new sampleRate
+            double ratioOfChange = sampleRate / mSampleRate;
+            mGrainLengthInSamples = mGrainLengthInSamples * ratioOfChange;
+            mEmissionPeriodInSamples = mEmissionPeriodInSamples * ratioOfChange;
+        }
+
+
+        mSampleRate = sampleRate;
+
+    }
 }
 
 //
@@ -31,7 +44,15 @@ const double Granulator::getCurrentSampleRate()
 //
 void Granulator::setGrainLengthInMs(double lengthInMs)
 {
-    mGrainLengthInSamples = (lengthInMs * 0.001) * mSampleRate;
+    int numSamples = (lengthInMs * 0.001) * mSampleRate;
+    this->setGrainLengthInSamples(numSamples);
+}
+
+//
+void Granulator::setGrainLengthInSamples(int numSamples)
+{
+    mGrainLengthInSamples = numSamples;
+    mWindow.setPeriod(mGrainLengthInSamples);
 }
 
 //
@@ -43,12 +64,16 @@ const int Granulator::getGrainLengthInSamples()
 //
 void Granulator::setEmissionRateInHz(double rateInHz)
 {
-    if(rateInHz <= 0)
-        mEmissionRateInHz = 0;
+    if(rateInHz > 0)
+        mEmissionPeriodInSamples = (int)mSampleRate / rateInHz;
     else
-        mEmissionRateInHz = rateInHz;
+        mEmissionPeriodInSamples = 0;
+}
 
-    _updateEmissionPeriod();
+//
+void Granulator::setEmissionPeriodInSamples(int numSamples)
+{
+    mEmissionPeriodInSamples = numSamples;
 }
 
 //
@@ -57,14 +82,6 @@ const int Granulator::getEmissionPeriodInSamples()
     return mEmissionPeriodInSamples;
 }
 
-//
-void Granulator::_updateEmissionPeriod()
-{
-    if(mSampleRate == 0 || mEmissionRateInHz <= 0)
-        mEmissionPeriodInSamples = 0;
-    else
-        mEmissionPeriodInSamples = mSampleRate / mEmissionRateInHz;
-}
 
 
 
@@ -77,6 +94,9 @@ void Granulator::process(juce::AudioBuffer<float>& buffer)
     for(int sampleIndex = 0; sampleIndex < numSamples; sampleIndex++)
     {   
         auto windowGain = 1.f;
+        
+        windowGain *= mWindow.getNextSample();
+
         if(mCurrentPhaseIndex >= mGrainLengthInSamples)
             windowGain = 0.f;
         
@@ -90,4 +110,11 @@ void Granulator::process(juce::AudioBuffer<float>& buffer)
         if(mCurrentPhaseIndex >= mEmissionPeriodInSamples)
             mCurrentPhaseIndex = 0;
     }
+}
+
+
+//=======================
+void Granulator::setGrainShape(Window::Shape newShape)
+{
+    mWindow.setShape(newShape);
 }

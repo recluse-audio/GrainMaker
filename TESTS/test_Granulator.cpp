@@ -6,6 +6,10 @@
 #include "../SOURCE/Granulator.h"
 
 #include "../SUBMODULES/RD/SOURCE/BufferFiller.h"
+#include "../SUBMODULES/RD/SOURCE/Window.h"
+#include "../SUBMODULES/RD/SOURCE/RelativeFilePath.h"
+#include "../SUBMODULES/RD/SOURCE/BufferHelper.h"
+
 
 static const double kDefaultSampleRate = 48000;
 
@@ -138,25 +142,21 @@ TEST_CASE("Can granulate buffer with no window into multiple grains")
 //======================
 TEST_CASE("Can process buffer with hanning window")
 {
-    // juce::AudioBuffer<float> buffer(1, kDefaultSampleRate);
-    // BufferFiller::fillWithAllOnes(buffer);
+    juce::AudioBuffer<float> buffer(1, 1024);
+    BufferFiller::fillWithAllOnes(buffer);
 
-    // Granulator granulator;
-    // granulator.prepare(kDefaultSampleRate);
-    // granulator.setEmissionRateInHz(1);
-    // granulator.setGrainLengthInMs(500);
+    Granulator granulator;
+    granulator.prepare(kDefaultSampleRate);
+    granulator.setEmissionPeriodInSamples(1024);
+    granulator.setGrainLengthInSamples(1024);
+    granulator.setGrainShape(Window::Shape::kHanning);
+    granulator.process(buffer);
 
-    // granulator.process(buffer);
+    // Get golden hanning buffer from .csv
+    auto goldenPath = RelativeFilePath::getGoldenFilePath("GOLDEN_HanningBuffer_1024.csv");
+    juce::AudioBuffer<float> goldenBuffer;
+    BufferFiller::loadFromCSV(goldenBuffer, goldenPath);
 
-    // for(int sampleIndex = 0; sampleIndex < (kDefaultSampleRate * 0.5); sampleIndex++)
-    // {
-    //     auto sample = buffer.getSample(0, sampleIndex);
-    //     CHECK(sample == 1.f);
-    // }
+    CHECK(BufferHelper::buffersAreIdentical(goldenBuffer, buffer, 0.01) == true);
 
-    // for(int sampleIndex = (kDefaultSampleRate * 0.5); sampleIndex < kDefaultSampleRate; sampleIndex++)
-    // {
-    //     auto sample = buffer.getSample(0, sampleIndex);
-    //     CHECK(sample == 0.f);
-    // }
 }
