@@ -16,6 +16,12 @@ PluginProcessor::PluginProcessor()
     mCircularBuffer = std::make_unique<CircularBuffer>();
     mGranulator = std::make_unique<Granulator>();
 
+    mGranulator->setEmissionPeriodInSamples(1024);
+    mGranulator->setGrainLengthInSamples(1024);
+    mGranulator->setGrainShape(Window::Shape::kHanning);
+
+    _initParameterListeners();
+
 }
 
 //=================================
@@ -107,8 +113,11 @@ void PluginProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     mCircularBuffer->setDelay(sampleRate / 2);
 
     mGranulator->prepare(sampleRate);
-    mGranulator->setEmissionRateInHz(20);
-    mGranulator->setGrainLengthInMs(25);
+
+    mGranulator->setEmissionPeriodInSamples(44100);
+    mGranulator->setGrainLengthInSamples(44100);
+    mGranulator->setGrainShape(Window::Shape::kHanning);
+
 }
 
 void PluginProcessor::releaseResources()
@@ -218,6 +227,10 @@ void PluginProcessor::parameterChanged(const juce::String& parameterID, float ne
     {
         mGrainCorrector->setTransposeRatio(newValue);
     }
+    else if(parameterID == "emission rate")
+    {
+        mGranulator->setEmissionRateInHz(newValue);
+    }
 }
 
 //==================================
@@ -238,6 +251,13 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::_createPara
         1.5f,           // Max value
         1.f));         // Default value
 
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "emission rate",         // Parameter ID
+        "Emission Rate",         // Parameter name
+        1.f,           // Min value
+        40.f,           // Max value
+        1.f));         // Default value
+        
     return { params.begin(), params.end() };
 }
 
@@ -249,4 +269,11 @@ juce::AudioProcessor::BusesProperties PluginProcessor::_getBusesProperties()
     return BusesProperties()
                 .withInput("Input", juce::AudioChannelSet::stereo(), true)
                 .withOutput("Output", juce::AudioChannelSet::stereo(), true);
+}
+
+//===================
+void PluginProcessor::_initParameterListeners()
+{
+    apvts.addParameterListener("shift ratio", this);
+    apvts.addParameterListener("emission rate", this);
 }
