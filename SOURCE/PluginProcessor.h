@@ -62,6 +62,8 @@ private:
 
     juce::AudioProcessorValueTreeState apvts;
     juce::AudioProcessorValueTreeState::ParameterLayout _createParameterLayout();
+
+    void _initParameterListeners();
     // cleanup ugly code in PluginProcessor's constructor
     juce::AudioProcessor::BusesProperties _getBusesProperties();
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (PluginProcessor)

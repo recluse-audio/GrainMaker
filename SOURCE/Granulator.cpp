@@ -20,14 +20,14 @@ void Granulator::prepare(double sampleRate)
 {
     if(sampleRate != mSampleRate)
     {
-        // don't divide by zero
-        if(mSampleRate > 0)
-        {
-            // re-calc the grain period based on new sampleRate
-            double ratioOfChange = sampleRate / mSampleRate;
-            mGrainLengthInSamples = mGrainLengthInSamples * ratioOfChange;
-            mEmissionPeriodInSamples = mEmissionPeriodInSamples * ratioOfChange;
-        }
+        // // don't divide by zero
+        // if(mSampleRate > 0)
+        // {
+        //     // re-calc the grain period based on new sampleRate
+        //     double ratioOfChange = sampleRate / mSampleRate;
+        //     mGrainLengthInSamples = mGrainLengthInSamples * ratioOfChange;
+        //     mEmissionPeriodInSamples = mEmissionPeriodInSamples * ratioOfChange;
+        // }
 
 
         mSampleRate = sampleRate;
@@ -64,10 +64,13 @@ const int Granulator::getGrainLengthInSamples()
 //
 void Granulator::setEmissionRateInHz(double rateInHz)
 {
-    if(rateInHz > 0)
-        mEmissionPeriodInSamples = (int)mSampleRate / rateInHz;
-    else
-        mEmissionPeriodInSamples = 0;
+    int newEmissionPeriod = 0;
+    if(rateInHz > 0 && mSampleRate > 0)
+        newEmissionPeriod = (int)mSampleRate / rateInHz;
+
+    this->setEmissionPeriodInSamples(newEmissionPeriod);
+    // TODO: This is temp, shouldn't auto update grain with new emission rate unless using a percentage
+    this->setGrainLengthInSamples(newEmissionPeriod);
 }
 
 //
@@ -95,10 +98,12 @@ void Granulator::process(juce::AudioBuffer<float>& buffer)
     {   
         auto windowGain = 1.f;
         
-        windowGain *= mWindow.getNextSample();
 
         if(mCurrentPhaseIndex >= mGrainLengthInSamples)
             windowGain = 0.f;
+        else
+            windowGain = mWindow.getNextSample();
+
         
         for(int ch = 0; ch < numChannels; ch++)
         {
@@ -108,7 +113,11 @@ void Granulator::process(juce::AudioBuffer<float>& buffer)
 
         mCurrentPhaseIndex++;
         if(mCurrentPhaseIndex >= mEmissionPeriodInSamples)
+        {
             mCurrentPhaseIndex = 0;
+            mWindow.setReadPos(0);
+
+        }
     }
 }
 
