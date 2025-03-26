@@ -21,13 +21,13 @@ void Granulator::prepare(double sampleRate)
     if(sampleRate != mSampleRate)
     {
         // // don't divide by zero
-        // if(mSampleRate > 0)
-        // {
-        //     // re-calc the grain period based on new sampleRate
-        //     double ratioOfChange = sampleRate / mSampleRate;
-        //     mGrainLengthInSamples = mGrainLengthInSamples * ratioOfChange;
-        //     mEmissionPeriodInSamples = mEmissionPeriodInSamples * ratioOfChange;
-        // }
+        if(mSampleRate > 0)
+        {
+            // re-calc the grain period based on new sampleRate
+            double ratioOfChange = sampleRate / mSampleRate;
+            mGrainLengthInSamples = mGrainLengthInSamples * ratioOfChange;
+            mEmissionPeriodInSamples = mEmissionPeriodInSamples * ratioOfChange;
+        }
 
 
         mSampleRate = sampleRate;
