@@ -42,6 +42,8 @@ public:
     void setEmissionPeriodInSamples(int numSamples);
     const int getEmissionPeriodInSamples();
 
+	void setPhaseOffset(float phaseOffset);
+	
     void process(juce::AudioBuffer<float>& buffer);
 private:
     double mSampleRate = -1;

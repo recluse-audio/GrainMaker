@@ -7,6 +7,7 @@
 Granulator::Granulator()
 {
     mWindow.setShape(Window::Shape::kNone);
+	mWindow.setLooping(true);
 }
 
 //
@@ -77,6 +78,8 @@ void Granulator::setEmissionRateInHz(double rateInHz)
 void Granulator::setEmissionPeriodInSamples(int numSamples)
 {
     mEmissionPeriodInSamples = numSamples;
+	// TODO: This is temp, shouldn't auto update grain with new emission rate unless using a percentage
+	this->setGrainLengthInSamples(mEmissionPeriodInSamples);
 }
 
 //
@@ -85,7 +88,11 @@ const int Granulator::getEmissionPeriodInSamples()
     return mEmissionPeriodInSamples;
 }
 
+//===============
+void Granulator::setPhaseOffset(float phaseOffset)
+{
 
+}
 
 
 //=====================

@@ -54,6 +54,7 @@ public:
     void parameterChanged(const juce::String& parameterID, float newValue) override;
 
 private:
+	float mShiftRatio = 1.f;
     std::unique_ptr<PitchDetector> mPitchDetector;
     std::unique_ptr<PitchMarkedCircularBuffer> mPMCBuffer;
     std::unique_ptr<GrainCorrector> mGrainCorrector;
