@@ -157,11 +157,12 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     auto totalNumInputChannels  = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
 
-    mCircularBuffer->pushBuffer(buffer);
-    mCircularBuffer->popBuffer(buffer);
+    // mCircularBuffer->pushBuffer(buffer);
+    // mCircularBuffer->popBuffer(buffer);
 
-    mGranulator->process(buffer);
-    // float detected_period = mPitchDetector->process(buffer);
+    float detected_period = mPitchDetector->process(buffer);
+	mGranulator->setEmissionPeriodInSamples(detected_period * mShiftRatio);
+	mGranulator->process(buffer);
 
     // mPMCBuffer->pushBufferAndPeriod(buffer, detected_period);
     // mGrainCorrector->process(buffer);
@@ -225,11 +226,12 @@ void PluginProcessor::parameterChanged(const juce::String& parameterID, float ne
 {
     if(parameterID == "shift ratio")
     {
-        mGrainCorrector->setTransposeRatio(newValue);
+		mShiftRatio = newValue;
+        //mGrainCorrector->setTransposeRatio(newValue);
     }
     else if(parameterID == "emission rate")
     {
-        mGranulator->setEmissionRateInHz(newValue);
+        //mGranulator->setEmissionRateInHz(newValue);
     }
 }
 
@@ -255,7 +257,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout PluginProcessor::_createPara
         "emission rate",         // Parameter ID
         "Emission Rate",         // Parameter name
         1.f,           // Min value
-        40.f,           // Max value
+        400.f,           // Max value
         1.f));         // Default value
         
     return { params.begin(), params.end() };
