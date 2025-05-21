@@ -45,6 +45,8 @@ public:
 	void setPhaseOffset(float phaseOffset);
 	
     void process(juce::AudioBuffer<float>& buffer);
+
+	void processShifting(juce::AudioBuffer<float>& lookaheadBuffer, juce::AudioBuffer<float>& outputBuffer, float detectedPeriod, float shiftRatio);
 private:
     double mSampleRate = -1;
     Window mWindow;

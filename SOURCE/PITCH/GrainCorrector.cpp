@@ -6,6 +6,7 @@ GrainCorrector::GrainCorrector(PitchMarkedCircularBuffer& pitchMarkedBuffer)
 : mPitchMarkedBuffer(pitchMarkedBuffer)
 {
     mWindow.setShape(Window::Shape::kHanning);
+	mWindow.setLooping(true);
 }
 
 //=================
@@ -76,7 +77,7 @@ void GrainCorrector::process(juce::AudioBuffer<float>& processBuffer)
 
             int analysisSubBlockLength = readEndIndex - readStartIndex;
             
-            int transposeOffset = (mTransposeRatio - 1.f) * (float)periodMarkerValue;
+            int transposeOffset = (mTransposeRatio - 1.f) * (float)periodMarkerValue * -1;
 
             if(transposeOffset == 0)
                 DBG("zero offset");

@@ -103,20 +103,27 @@ void PluginProcessor::changeProgramName (int index, const juce::String& newName)
 //==============================================================================
 void PluginProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
-    mPitchDetector->prepareToPlay(sampleRate, samplesPerBlock);
-    mPMCBuffer->prepare(sampleRate, samplesPerBlock);
-    mPMCBuffer->setSize(this->getNumOutputChannels(), (int)sampleRate); // by default 1 second
-    mGrainCorrector->prepare(sampleRate, samplesPerBlock);
-    mGrainCorrector->setOutputDelay(128);
+	int lookahead = 256;
 
-    mCircularBuffer->setSize(this->getNumOutputChannels(), (int)sampleRate * 2); // by default 1 second
-    mCircularBuffer->setDelay(sampleRate / 2);
+	mLookaheadBuffer.clear();
+	mLookaheadBuffer.setSize(this->getNumInputChannels(), samplesPerBlock + lookahead);
+
+    mPitchDetector->prepareToPlay(sampleRate, samplesPerBlock + lookahead);
+	
+    // mPMCBuffer->prepare(sampleRate, samplesPerBlock);
+    // mPMCBuffer->setSize(this->getNumOutputChannels(), (int)sampleRate); // by default 1 second
+
+    // mGrainCorrector->prepare(sampleRate, samplesPerBlock);
+    // mGrainCorrector->setOutputDelay(samplesPerBlock);
+
+    mCircularBuffer->setSize(this->getNumOutputChannels(), (int)sampleRate); // by default 1 second
+    mCircularBuffer->setDelay(lookahead);
 
     mGranulator->prepare(sampleRate);
 
-    mGranulator->setEmissionPeriodInSamples(44100);
-    mGranulator->setGrainLengthInSamples(44100);
-    mGranulator->setGrainShape(Window::Shape::kHanning);
+    // mGranulator->setEmissionPeriodInSamples(44100);
+    // mGranulator->setGrainLengthInSamples(44100);
+    // mGranulator->setGrainShape(Window::Shape::kHanning);
 
 }
 
@@ -157,12 +164,13 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     auto totalNumInputChannels  = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
 
-    // mCircularBuffer->pushBuffer(buffer);
-    // mCircularBuffer->popBuffer(buffer);
+    mCircularBuffer->pushBuffer(buffer);
+	buffer.clear();
+    mCircularBuffer->popBuffer(mLookaheadBuffer);
 
-    float detected_period = mPitchDetector->process(buffer);
-	mGranulator->setEmissionPeriodInSamples(detected_period * mShiftRatio);
-	mGranulator->process(buffer);
+    float detected_period = mPitchDetector->process(mLookaheadBuffer);
+	// mGranulator->setEmissionPeriodInSamples(detected_period * mShiftRatio);
+	mGranulator->processShifting(mLookaheadBuffer, buffer, detected_period, mShiftRatio);
 
     // mPMCBuffer->pushBufferAndPeriod(buffer, detected_period);
     // mGrainCorrector->process(buffer);
