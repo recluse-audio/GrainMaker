@@ -61,6 +61,8 @@ private:
     std::unique_ptr<CircularBuffer> mCircularBuffer;
     std::unique_ptr<Granulator> mGranulator;
 
+	juce::AudioBuffer<float> mLookaheadBuffer;
+
     juce::AudioProcessorValueTreeState apvts;
     juce::AudioProcessorValueTreeState::ParameterLayout _createParameterLayout();
 
