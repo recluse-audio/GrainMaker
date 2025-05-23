@@ -7,6 +7,7 @@
 Granulator::Granulator()
 {
     mWindow.setShape(Window::Shape::kNone);
+	mWindow.setLooping(true);
 }
 
 //
