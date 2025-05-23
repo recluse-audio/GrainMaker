@@ -6,7 +6,6 @@ GrainCorrector::GrainCorrector(PitchMarkedCircularBuffer& pitchMarkedBuffer)
 : mPitchMarkedBuffer(pitchMarkedBuffer)
 {
     mWindow.setShape(Window::Shape::kHanning);
-	mWindow.setLooping(true);
 }
 
 //=================

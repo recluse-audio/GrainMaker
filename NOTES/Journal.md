@@ -33,4 +33,13 @@ Back at it, I've given this thought but have been slow in progress.  Working on 
 Today I am trying a new approach which involves treating the lookaheadBuffer and outputBuffer as ARAAudioSource and ARAPlaybackRegion.  Or rather my work on "simple" ARA, which got far from simple.
 
 But I MUST test-drive this!  So what is the test to be had?
+I'll go top down, overly simplistic.
 
+#### OBJECTIVE 1: Write 
+
+
+
+### 2025-05-23 ###
+I lost some work, but hopefully not much... 
+
+Didn't push to remote often enough, 

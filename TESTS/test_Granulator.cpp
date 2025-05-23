@@ -217,7 +217,7 @@ TEST_CASE("Correct range is read from lookaheadBuffer and written to outputBuffe
     {
 		int expectedSample = sampleIndex + lookaheadNumSamples;
         int sample = (int)outputBuffer.getSample(0, sampleIndex);
-        CHECK(sample == expectedSample);
+        REQUIRE(sample == expectedSample);
     }
 }
 
