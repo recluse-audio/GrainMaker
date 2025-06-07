@@ -73,4 +73,7 @@ private:
 	/** Returns portion of a grain's range that will end up being written to outputBuffer (may be partial), this doesn't write, but tells us what to write and where  */
 	juce::Range<juce::int64> _getGrainRangeOverlappingOutput(juce::Range<juce::int64> rangeInLookahead, juce::Range<juce::int64> totalOutputRange, float shiftOffset);
 
+	// Number of samples to shift grains based on its period and shift ratio.
+	// rounds float values down and returns juce::int64
+	juce::int64 _getPitchShiftOffset(float detectedPeriod, float shiftRatio);
 };
