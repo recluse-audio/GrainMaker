@@ -43,3 +43,13 @@ I'll go top down, overly simplistic.
 I lost some work, but hopefully not much... 
 
 Didn't push to remote often enough, 
+
+
+### 2025-06-07 ###
+- [x] getRangeAsAudioBlock()
+- [x] writeBlockToRangeInBuffer()
+- [ ] calculateShiftOffset()
+- [ ] calculateReadRange()
+- [ ] calculateWriteRange()
+- [ ] _windowIndexAtIndexInPeriod()
+- [ ] _getWindowedGrainRangeAsBlock()

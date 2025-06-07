@@ -25,6 +25,12 @@ public:
 	{
 		return mGranulator.mWindow;
 	}
+
+	juce::int64 getPitchShiftOffset(float detectedPeriod, float shiftRatio)
+	{
+		return mGranulator._getPitchShiftOffset(detectedPeriod, shiftRatio);
+	}
+
 private:
 	Granulator& mGranulator;
 };
@@ -175,6 +181,27 @@ TEST_CASE("Can process buffer with hanning window")
 
     CHECK(BufferHelper::buffersAreIdentical(goldenBuffer, buffer, 0.01) == true);
 
+}
+
+//===============
+TEST_CASE("Can calculate correct offset due to pitch shifting.")
+{
+	Granulator granulator;
+	GranulatorTester granulatorTester(granulator);
+
+	SECTION("A shiftRatio of 1.f means no shifting, so we expect 0")
+	{
+		juce::int64 offset = granulatorTester.getPitchShiftOffset(100.f, 1.f);
+		juce::int64 expectedOffset = 0;
+		CHECK(offset == expectedOffset);
+	}
+
+	SECTION("A shiftRatio of 1.1f means shifting up, resulting in a positive value offset")
+	{
+		juce::int64 offset = granulatorTester.getPitchShiftOffset(100.f, 1.1f);
+		juce::int64 expectedOffset = 9;
+		CHECK(offset == expectedOffset);
+	}
 }
 
 //==========
