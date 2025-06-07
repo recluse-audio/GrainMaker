@@ -47,7 +47,10 @@ public:
     void process(juce::AudioBuffer<float>& buffer);
 
 	void processShifting(juce::AudioBuffer<float>& lookaheadBuffer, juce::AudioBuffer<float>& outputBuffer, float detectedPeriod, float shiftRatio);
+
+
 private:
+	friend class GranulatorTester;
     double mSampleRate = -1;
     Window mWindow;
 
@@ -64,6 +67,10 @@ private:
     int mCurrentPhaseIndex = 0; // Index within grain emission
     void _incrementPhase();
 
+	// accounts for current mPhaseIncrement and finds the value from the internal buffer
+	float _getWindowSampleAtIndexInPeriod(int indexInPeriod, float period);
 
+	/** Returns portion of a grain's range that will end up being written to outputBuffer (may be partial), this doesn't write, but tells us what to write and where  */
+	juce::Range<juce::int64> _getGrainRangeOverlappingOutput(juce::Range<juce::int64> rangeInLookahead, juce::Range<juce::int64> totalOutputRange, float shiftOffset);
 
 };
