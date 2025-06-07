@@ -1,4 +1,6 @@
 set(SOURCES
+    SOURCE/Grain.cpp
+    SOURCE/Grain.h
     SOURCE/Granulator.cpp
     SOURCE/Granulator.h
     SOURCE/PITCH/GrainCorrector.cpp

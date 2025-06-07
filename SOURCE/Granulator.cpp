@@ -124,7 +124,6 @@ void Granulator::process(juce::AudioBuffer<float>& buffer)
 //=======================
 void Granulator::processShifting(juce::AudioBuffer<float>& lookaheadBuffer, juce::AudioBuffer<float>& outputBuffer, float detectedPeriod, float shiftRatio)
 {
-	mWindow.setPeriod(detectedPeriod);
 	
 	int numLookAheadSamples = lookaheadBuffer.getNumSamples() - outputBuffer.getNumSamples();
 
@@ -137,22 +136,39 @@ void Granulator::processShifting(juce::AudioBuffer<float>& lookaheadBuffer, juce
 	// shifting down is essentially saying each grain occurs later in time relative to the previous grain
 	float shiftOffset = detectedPeriod - shiftedPeriod;
 
-	for(int readPos = 0; readPos < lookaheadBuffer.getNumSamples(); readPos++)
-	{
-		int writePos = readPos - numLookAheadSamples - shiftOffset;
-		float windowVal = mWindow.getNextSample();
-		// this sample index won't get written to output buffer, even after shifting up potentially
-		if(writePos < 0)
-			continue;
-		else if(writePos >= outputBuffer.getNumSamples())
-			break;
+	// This goes up in increments of the detected period starting at index 0 of the lookaheadBuffer
+	juce::int64 grainReadStart = 0; 
+	juce::int64 detectedPeriodInt = (juce::int64)detectedPeriod; // TODO: handle periods that arent' exactly whole numbers
 
-		for(int ch = 0; ch < outputBuffer.getNumChannels(); ch++)
-		{
-			float readSample = lookaheadBuffer.getSample(ch, readPos) * windowVal;
-			outputBuffer.setSample(ch, writePos, readSample);
-		}
+	// use this for checking if a grain from the lookaheadBuffer would write anything to the outputBufferRange
+	juce::Range<juce::int64> outputBufferRange (0, outputBuffer.getNumSamples());
+
+	while(grainReadStart <= lookaheadBuffer.getNumSamples())
+	{
+		juce::int64 grainReadEnd = grainReadStart + detectedPeriodInt;
+		if(grainReadEnd >= lookaheadBuffer.getNumSamples())
+			grainReadEnd = lookaheadBuffer.getNumSamples() - 1; // don't wrap like you often would in this situfation, this grain is done
+
+		juce::Range<juce::int64> readRangeInLookaheadBuffer(grainReadStart, grainReadEnd);
+
 	}
+
+	// for(int readPos = 0; readPos < lookaheadBuffer.getNumSamples(); readPos++)
+	// {
+	// 	int writePos = readPos - numLookAheadSamples - shiftOffset;
+	// 	float windowVal = mWindow.getNextSample();
+	// 	// this sample index won't get written to output buffer, even after shifting up potentially
+	// 	if(writePos < 0)
+	// 		continue;
+	// 	else if(writePos >= outputBuffer.getNumSamples())
+	// 		break;
+
+	// 	for(int ch = 0; ch < outputBuffer.getNumChannels(); ch++)
+	// 	{
+	// 		float readSample = lookaheadBuffer.getSample(ch, readPos) * windowVal;
+	// 		outputBuffer.setSample(ch, writePos, readSample);
+	// 	}
+	// }
 
 }
 
@@ -160,4 +176,23 @@ void Granulator::processShifting(juce::AudioBuffer<float>& lookaheadBuffer, juce
 void Granulator::setGrainShape(Window::Shape newShape)
 {
     mWindow.setShape(newShape);
+}
+
+
+
+
+//=================
+//
+float Granulator::_getWindowSampleAtIndexInPeriod(int indexInPeriod, float period)
+{
+	double phaseIncrement = (double)mWindow.getSize() / (double)period;
+	double readPos = (double)indexInPeriod * phaseIncrement;
+	return mWindow.getAtReadPos(readPos);
+}
+
+//=================
+//
+juce::Range<juce::int64> Granulator::_getGrainRangeOverlappingOutput(juce::Range<juce::int64> rangeInLookahead, juce::Range<juce::int64> totalOutputRange, float shiftOffset)
+{
+
 }
