@@ -59,9 +59,13 @@ private:
 	 */
 	struct GrainData
 	{
+		// Range of lookaheadBuffer
+		juce::Range<juce::int64> mSourceRange	 { 0, 0 };
 		// Range in lookaheadBuffer that is considered the current "grain" of audio data that will be shifted if necessary
-		juce::Range<juce::int64> mGrainRange     { 0, 0 };
-		// Where the grain would be in the lookaheadBuffer after shifting
+		juce::Range<juce::int64> mFullGrainRange { 0, 0 };
+		// Range for portion of mFullGrainRange that is within lookahead
+		juce::Range<juce::int64> mClippedGrainRange { 0, 0 };
+		// Where the grain would be after shift offset (lookahead offset not applied yet)
 		juce::Range<juce::int64> mShiftedRange   { 0, 0 };
 		// Range of mGrainRange that will be read to write to outputBuffer (might not read/write entire grain)
 		juce::Range<juce::int64> mReadRange      { 0, 0 };
@@ -96,7 +100,9 @@ private:
 
 	// Float indices get converted to juce::int64 in these functions
 	// fix or optimize them here and don't worry about chasing them down all over the repo
-	void _updateGrainRange(float startIndex, float detectedPeriod, const juce::AudioBuffer<float>& lookaheadBuffer);
+	void _updateSourceRange(const juce::AudioBuffer<float>& lookaheadBuffer);
+	void _updateFullGrainRange(float startIndex, float detectedPeriod);
+	void _updateClippedGrainRange();
 	void _updateShiftRange(float detectedPeriod, float shiftRatio);
 	void _updateReadRange();
 	// Would mShiftedRange be written to outputBuffer after considering the lookahead num samples
