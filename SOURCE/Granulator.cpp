@@ -207,42 +207,67 @@ juce::int64 Granulator::_calculatePitchShiftOffset(float period, float shiftRati
 	return shiftOffset;
 }
 
+
+
 //==============================================================================
-void Granulator::_updateGrainRange(float startIndex, float detectedPeriod, const juce::AudioBuffer<float>& lookaheadBuffer)
+void Granulator::_updateSourceRange(const juce::AudioBuffer<float>& lookaheadBuffer)
 {
-	juce::int64 startIndexInt = (juce::int64)startIndex;
-	juce::int64 endIndexInt = (juce::int64)detectedPeriod + startIndexInt;
-	juce::int64 bufferNumSamples = (juce::int64)lookaheadBuffer.getNumSamples();
+	mCurrentGrainData.mSourceRange.setStart( 0 );
+	mCurrentGrainData.mSourceRange.setEnd( (juce::int64) (lookaheadBuffer.getNumSamples() - 1) );
+}
 
-	// shouldn't happen, equivalent to starting after or ending before lookahead buffer in concept
-	if(startIndexInt >= bufferNumSamples || endIndexInt < 0 )
-	{
-		mCurrentGrainData.mGrainRange.setStart(0);
-		mCurrentGrainData.mGrainRange.setEnd(0);
-		return; //
-	}
+//==============================================================================
+void Granulator::_updateFullGrainRange(float startIndex, float detectedPeriod)
+{
+	mCurrentGrainData.mFullGrainRange.setStart( (juce::int64)startIndex );
+	mCurrentGrainData.mFullGrainRange.setEnd( (juce::int64)detectedPeriod + (juce::int64)startIndex );
+}
+
+//==============================================================================
+void Granulator::_updateClippedGrainRange()
+{
+	// juce::int64 startIndexInt = (juce::int64)startIndex;
+	// juce::int64 endIndexInt = (juce::int64)detectedPeriod + startIndexInt;
+	// juce::int64 bufferNumSamples = (juce::int64)lookaheadBuffer.getNumSamples();
+
+	// juce::Range<juce::int64> fullGrainRange;
+	// fullGrainRange.setStart(startIndexInt); 
+	// fullGrainRange.setEnd(endIndexInt);
+
+	// juce::Range<juce::int64> fullBufferRange;
+	// fullBufferRange.setStart(0);
+	// fullBufferRange.setEnd(bufferNumSamples-1);
+
+	// mCurrentGrainData.mFullGrainRange = fullGrainRange.getIntersectionWith(fullBufferRange);
+	// // shouldn't happen, equivalent to starting after or ending before lookahead buffer in concept
+	// if(startIndexInt >= bufferNumSamples || endIndexInt < 0 )
+	// {
+	// 	mCurrentGrainData.mFullGrainRange.setStart(0);
+	// 	mCurrentGrainData.mFullGrainRange.setEnd(0);
+	// 	return; //
+	// }
 
 
-	// pertains to read index in audio buffer so don't want negative indices
-	if(startIndexInt < 0)
-		startIndexInt = 0;
+	// // pertains to read index in audio buffer so don't want negative indices
+	// if(startIndexInt < 0)
+	// 	startIndexInt = 0;
 
-	// end index is first of buffer, so start should be zero to be valid
-	if( endIndexInt == 0 )
-		startIndexInt = endIndexInt;
+	// // end index is first of buffer, so start should be zero to be valid
+	// if( endIndexInt == 0 )
+	// 	startIndexInt = endIndexInt;
 
-	// start is final sample so end should be final sample as well
-	if(startIndexInt == bufferNumSamples - 1)
-		endIndexInt = startIndexInt;
+	// // start is final sample so end should be final sample as well
+	// if(startIndexInt == bufferNumSamples - 1)
+	// 	endIndexInt = startIndexInt;
 
-	// clips the range of the current grain should it happen to extend past the end of the lookaheadBuffer
-	// aka partial grain
-	if(endIndexInt >= bufferNumSamples)
-		endIndexInt = bufferNumSamples - 1;
+	// // clips the range of the current grain should it happen to extend past the end of the lookaheadBuffer
+	// // aka partial grain
+	// if(endIndexInt >= bufferNumSamples)
+	// 	endIndexInt = bufferNumSamples - 1;
 
 	
-	mCurrentGrainData.mGrainRange.setStart(startIndexInt);
-	mCurrentGrainData.mGrainRange.setEnd(endIndexInt);
+	// mCurrentGrainData.mFullGrainRange.setStart(startIndexInt);
+	// mCurrentGrainData.mFullGrainRange.setEnd(endIndexInt);
 
 }
 

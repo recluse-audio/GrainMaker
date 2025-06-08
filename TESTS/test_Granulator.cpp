@@ -31,39 +31,113 @@ public:
 		return mGranulator._calculatePitchShiftOffset(detectedPeriod, shiftRatio);
 	}
 
-	void updateGrainRange(float startIndex, float lengthInSamples, const juce::AudioBuffer<float>& lookaheadBuffer)
-	{ 
-		mGranulator._updateGrainRange(startIndex, lengthInSamples, lookaheadBuffer); 
-	}
-	void updateShiftRange(float detectedPeriod, float shiftRatio)
-	{
-
-	}
+	// setters aka "updaters" for Granulators internal GrainData ranges
+	void updateSourceRange(const juce::AudioBuffer<float>& lookaheadBuffer) { mGranulator._updateSourceRange(lookaheadBuffer); }
+	void updateFullGrainRange(float startIndex, float lengthInSamples)	{ mGranulator._updateFullGrainRange(startIndex, lengthInSamples); }
+	void updateClippedGrainRange() { mGranulator._updateClippedGrainRange(); }
+	void updateShiftRange(float detectedPeriod, float shiftRatio) { mGranulator._updateShiftRange(detectedPeriod, shiftRatio); }
 	void updateReadRange() { mGranulator._updateReadRange(); }
 	void updateWriteRange() { mGranulator._updateWriteRange(); }
 
-	enum Range
-	{
-		grainRange = 0,
-		shiftedRange = 1,
-		readRange = 2,
-		writeRange = 3
-	};
+	// getters for GrainData ranges used to read/write shifted grains
+	juce::Range<juce::int64>& getSourceRange()       { return mGranulator.mCurrentGrainData.mSourceRange; }
+	juce::Range<juce::int64>& getFullGrainRange()    { return mGranulator.mCurrentGrainData.mFullGrainRange; }
+	juce::Range<juce::int64>& getClippedGrainRange() { return mGranulator.mCurrentGrainData.mClippedGrainRange; }
+	juce::Range<juce::int64>& getShiftedRange()      { return mGranulator.mCurrentGrainData.mShiftedRange; }
+	juce::Range<juce::int64>& getReadRange()         { return mGranulator.mCurrentGrainData.mReadRange; }
+	juce::Range<juce::int64>& getWriteRange()        { return mGranulator.mCurrentGrainData.mWriteRange; }
 
-	juce::Range<juce::int64>& getRange(Range range)
-	{
-		switch(range)
-		{
-			case Range::grainRange: return mGranulator.mCurrentGrainData.mGrainRange;
-			case Range::shiftedRange: return mGranulator.mCurrentGrainData.mShiftedRange;
-			case Range::readRange: return mGranulator.mCurrentGrainData.mReadRange;
-			case Range::writeRange: return mGranulator.mCurrentGrainData.mWriteRange;
-		}
-	}
 
 private:
 	Granulator& mGranulator;
 };
+
+
+//=============================================================================
+//========= GRANULATOR's internal ranges associated with GrainData ============
+//=============================================================================
+//
+
+//=================================================================
+//
+TEST_CASE("Granulator::mCurrentGrain::mSourceRange is updated correctly")
+{
+	Granulator granulator;
+	GranulatorTester granulatorTester(granulator);
+	juce::AudioBuffer<float> buffer (1, 100);
+
+	// must do this first
+	granulatorTester.updateSourceRange(buffer);
+	juce::Range<juce::int64> range = granulatorTester.getSourceRange();
+	CHECK(range.getStart() == (juce::int64)0);
+	CHECK(range.getEnd() == (juce::int64)buffer.getNumSamples() - 1);
+}
+
+//=================================================================
+//
+TEST_CASE("Granulator::mCurrentGrain::mFullGrainRange is updated correctly")
+{
+	Granulator granulator;
+	GranulatorTester granulatorTester(granulator);
+	juce::AudioBuffer<float> buffer (1, 100);
+
+	// Step #1, this relies on source range being updated first
+	granulatorTester.updateSourceRange(buffer);
+
+	SECTION("Grain all within source range.")
+	{
+		float startIndex = 0.f;
+		float period = 10.f;
+		granulatorTester.updateFullGrainRange(startIndex, period);
+		juce::Range<juce::int64> range = granulatorTester.getFullGrainRange();
+
+		juce::int64 expectedStartIndex = (juce::int64)startIndex;
+		juce::int64 expectedEndIndex = (juce::int64)period + startIndex;
+
+		CHECK(range.getStart() == expectedStartIndex);
+		CHECK(range.getEnd() == expectedEndIndex);
+	}
+
+	// this ensures the ideological tilt of the class is preserved
+	SECTION("mFullGrainRange starting after the lookaheadBuffer is not clipped")
+	{
+		float startIndex = 101.f;
+		float period = 10.f;
+		granulatorTester.updateFullGrainRange(startIndex, period);
+		juce::Range<juce::int64> range = granulatorTester.getFullGrainRange();
+
+		juce::int64 expectedStartIndex = (juce::int64)startIndex;
+		juce::int64 expectedEndIndex = (juce::int64)period + startIndex;
+
+		CHECK(range.getStart() == expectedStartIndex);
+		CHECK(range.getEnd() == expectedEndIndex);
+	}
+
+		
+
+	// this ensures the ideological tilt of the class is preserved
+	SECTION("mFullGrainRange starting after the lookaheadBuffer is not clipped")
+	{
+		float startIndex = -11.f;
+		float period = 10.f;
+		granulatorTester.updateFullGrainRange(startIndex, period);
+		juce::Range<juce::int64> range = granulatorTester.getFullGrainRange();
+
+		juce::int64 expectedStartIndex = (juce::int64)startIndex;
+		juce::int64 expectedEndIndex = (juce::int64)period + startIndex;
+
+		CHECK(range.getStart() == expectedStartIndex);
+		CHECK(range.getEnd() == expectedEndIndex);
+	}
+}
+
+
+//====================== END RANGE TESTS ==========================
+//=================================================================
+
+
+//====================================
+//===================================
 
 TEST_CASE("Can set sample rate in Granulator")
 {
@@ -218,35 +292,6 @@ TEST_CASE("Can calculate correct offset due to pitch shifting.")
 		juce::int64 offset = granulatorTester.getPitchShiftOffset(100000.f, 0.9f);
 		juce::int64 expectedOffset = -11111;
 		CHECK(offset == expectedOffset);
-	}
-}
-
-//=================
-//
-TEST_CASE("Grain range is updated properly")
-{
-	Granulator granulator;
-	GranulatorTester granulatorTester(granulator);
-	juce::AudioBuffer<float> lookaheadBuffer(1, 100);
-
-	SECTION("Range for first period worth of data from buffer starting at 0")
-	{
-		float startIndex = 0.f;
-		float detectedPeriod = 10.f;
-		granulatorTester.updateGrainRange(startIndex, detectedPeriod, lookaheadBuffer);
-		juce::Range<juce::int64>& grainRange = granulatorTester.getRange(GranulatorTester::Range::grainRange);
-		CHECK(grainRange.getStart() == (juce::int64)startIndex);
-		CHECK(grainRange.getEnd() == (juce::int64)detectedPeriod );
-	}
-
-	SECTION("grainRange stays in bounds of lookahead buffer numsamples")
-	{
-		float startIndex = 91.f;
-		float detectedPeriod = 10.f;
-		granulatorTester.updateGrainRange(startIndex, detectedPeriod, lookaheadBuffer);
-		juce::Range<juce::int64>& grainRange = granulatorTester.getRange(GranulatorTester::Range::grainRange);
-		CHECK(grainRange.getStart() == (juce::int64)startIndex);
-		CHECK(grainRange.getEnd() == (juce::int64)lookaheadBuffer.getNumSamples() - 1 );
 	}
 }
 
