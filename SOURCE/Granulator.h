@@ -54,6 +54,23 @@ private:
     double mSampleRate = -1;
     Window mWindow;
 
+	/** 
+	 * @brief These Ranges get used ever processBlock so it made sense to make them member variables
+	 */
+	struct GrainData
+	{
+		// Range in lookaheadBuffer that is considered the current "grain" of audio data that will be shifted if necessary
+		juce::Range<juce::int64> mGrainRange     { 0, 0 };
+		// Where the grain would be in the lookaheadBuffer after shifting
+		juce::Range<juce::int64> mShiftedRange   { 0, 0 };
+		// Range of mGrainRange that will be read to write to outputBuffer (might not read/write entire grain)
+		juce::Range<juce::int64> mReadRange      { 0, 0 };
+		// Would mShiftedRange be written to outputBuffer after considering the lookahead num samples
+		juce::Range<juce::int64> mWriteRange     { 0, 0 };
+	};
+	GrainData mCurrentGrainData;
+
+	
     int mGrainLengthInSamples = -1; // length of audio segment being windowed
     /**
      * @brief Length between one grain emission and the next.
@@ -75,5 +92,13 @@ private:
 
 	// Number of samples to shift grains based on its period and shift ratio.
 	// rounds float values down and returns juce::int64
-	juce::int64 _getPitchShiftOffset(float detectedPeriod, float shiftRatio);
+	juce::int64 _calculatePitchShiftOffset(float detectedPeriod, float shiftRatio);
+
+	// Float indices get converted to juce::int64 in these functions
+	// fix or optimize them here and don't worry about chasing them down all over the repo
+	void _updateGrainRange(float startIndex, float detectedPeriod, const juce::AudioBuffer<float>& lookaheadBuffer);
+	void _updateShiftRange(float detectedPeriod, float shiftRatio);
+	void _updateReadRange();
+	// Would mShiftedRange be written to outputBuffer after considering the lookahead num samples
+	void _updateWriteRange();
 };
