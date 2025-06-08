@@ -28,7 +28,37 @@ public:
 
 	juce::int64 getPitchShiftOffset(float detectedPeriod, float shiftRatio)
 	{
-		return mGranulator._getPitchShiftOffset(detectedPeriod, shiftRatio);
+		return mGranulator._calculatePitchShiftOffset(detectedPeriod, shiftRatio);
+	}
+
+	void updateGrainRange(float startIndex, float lengthInSamples, const juce::AudioBuffer<float>& lookaheadBuffer)
+	{ 
+		mGranulator._updateGrainRange(startIndex, lengthInSamples, lookaheadBuffer); 
+	}
+	void updateShiftRange(float detectedPeriod, float shiftRatio)
+	{
+
+	}
+	void updateReadRange() { mGranulator._updateReadRange(); }
+	void updateWriteRange() { mGranulator._updateWriteRange(); }
+
+	enum Range
+	{
+		grainRange = 0,
+		shiftedRange = 1,
+		readRange = 2,
+		writeRange = 3
+	};
+
+	juce::Range<juce::int64>& getRange(Range range)
+	{
+		switch(range)
+		{
+			case Range::grainRange: return mGranulator.mCurrentGrainData.mGrainRange;
+			case Range::shiftedRange: return mGranulator.mCurrentGrainData.mShiftedRange;
+			case Range::readRange: return mGranulator.mCurrentGrainData.mReadRange;
+			case Range::writeRange: return mGranulator.mCurrentGrainData.mWriteRange;
+		}
 	}
 
 private:
@@ -86,27 +116,7 @@ TEST_CASE("Can set grain emission rate in hertz in Granulator")
 //======================
 TEST_CASE("Can process buffer with no window")
 {
-    // juce::AudioBuffer<float> buffer(1, kDefaultSampleRate);
-    // BufferFiller::fillWithAllOnes(buffer);
 
-    // Granulator granulator;
-    // granulator.prepare(kDefaultSampleRate);
-    // granulator.setEmissionRateInHz(1);
-    // granulator.setGrainLengthInMs(500);
-
-    // granulator.process(buffer);
-
-    // for(int sampleIndex = 0; sampleIndex < (kDefaultSampleRate * 0.5); sampleIndex++)
-    // {
-    //     auto sample = buffer.getSample(0, sampleIndex);
-    //     CHECK(sample == 1.f);
-    // }
-
-    // for(int sampleIndex = (kDefaultSampleRate * 0.5); sampleIndex < kDefaultSampleRate; sampleIndex++)
-    // {
-    //     auto sample = buffer.getSample(0, sampleIndex);
-    //     CHECK(sample == 0.f);
-    // }
 }
 
 
@@ -198,13 +208,58 @@ TEST_CASE("Can calculate correct offset due to pitch shifting.")
 
 	SECTION("A shiftRatio of 1.1f means shifting up, resulting in a positive value offset")
 	{
-		juce::int64 offset = granulatorTester.getPitchShiftOffset(100.f, 1.1f);
-		juce::int64 expectedOffset = 9;
+		juce::int64 offset = granulatorTester.getPitchShiftOffset(100000.f, 1.1f);
+		juce::int64 expectedOffset = 9090;
+		CHECK(offset == expectedOffset);
+	}
+
+	SECTION("A shiftRatio of 0.9f means shifting down, resulting in a negative value offset")
+	{
+		juce::int64 offset = granulatorTester.getPitchShiftOffset(100000.f, 0.9f);
+		juce::int64 expectedOffset = -11111;
 		CHECK(offset == expectedOffset);
 	}
 }
 
-//==========
+//=================
+//
+TEST_CASE("Grain range is updated properly")
+{
+	Granulator granulator;
+	GranulatorTester granulatorTester(granulator);
+	juce::AudioBuffer<float> lookaheadBuffer(1, 100);
+
+	SECTION("Range for first period worth of data from buffer starting at 0")
+	{
+		float startIndex = 0.f;
+		float detectedPeriod = 10.f;
+		granulatorTester.updateGrainRange(startIndex, detectedPeriod, lookaheadBuffer);
+		juce::Range<juce::int64>& grainRange = granulatorTester.getRange(GranulatorTester::Range::grainRange);
+		CHECK(grainRange.getStart() == (juce::int64)startIndex);
+		CHECK(grainRange.getEnd() == (juce::int64)detectedPeriod );
+	}
+
+	SECTION("grainRange stays in bounds of lookahead buffer numsamples")
+	{
+		float startIndex = 91.f;
+		float detectedPeriod = 10.f;
+		granulatorTester.updateGrainRange(startIndex, detectedPeriod, lookaheadBuffer);
+		juce::Range<juce::int64>& grainRange = granulatorTester.getRange(GranulatorTester::Range::grainRange);
+		CHECK(grainRange.getStart() == (juce::int64)startIndex);
+		CHECK(grainRange.getEnd() == (juce::int64)lookaheadBuffer.getNumSamples() - 1 );
+	}
+}
+
+
+
+
+
+//==============================
+//==============================
+//==============================
+//==============================
+//========== OLD and maybe de-commissioned
+//==============================
 TEST_CASE("Grains are correctly written from lookahead buffer to output buffer with no shifting")
 {
 	// Granulator granulator;

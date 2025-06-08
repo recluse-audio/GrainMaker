@@ -129,7 +129,7 @@ void Granulator::processShifting(juce::AudioBuffer<float>& lookaheadBuffer, juce
 
 
 
-	juce::int64 pitchShiftOffset = _getPitchShiftOffset(detectedPeriod, shiftRatio);
+	juce::int64 pitchShiftOffset = _calculatePitchShiftOffset(detectedPeriod, shiftRatio);
 
 	// This goes up in increments of the detected period starting at index 0 of the lookaheadBuffer
 	juce::int64 grainReadStart = 0; 
@@ -194,7 +194,7 @@ juce::Range<juce::int64> Granulator::_getGrainRangeOverlappingOutput(juce::Range
 
 //=================
 // TODO: return a float here and get an interpolated sample for that last partial value
-juce::int64 Granulator::_getPitchShiftOffset(float period, float shiftRatio)
+juce::int64 Granulator::_calculatePitchShiftOffset(float period, float shiftRatio)
 {
 	// a grain that is shifted up will result in a shiftedPeriod that is smaller than the detectedPeriod
 	float shiftedPeriod = period * (1.f / shiftRatio);
@@ -205,4 +205,61 @@ juce::int64 Granulator::_getPitchShiftOffset(float period, float shiftRatio)
 	// shifting down is essentially saying each grain occurs later in time relative to the previous grain
 	juce::int64 shiftOffset = (juce::int64)(period - shiftedPeriod);
 	return shiftOffset;
+}
+
+//==============================================================================
+void Granulator::_updateGrainRange(float startIndex, float detectedPeriod, const juce::AudioBuffer<float>& lookaheadBuffer)
+{
+	juce::int64 startIndexInt = (juce::int64)startIndex;
+	juce::int64 endIndexInt = (juce::int64)detectedPeriod + startIndexInt;
+	juce::int64 bufferNumSamples = (juce::int64)lookaheadBuffer.getNumSamples();
+
+	// shouldn't happen, equivalent to starting after or ending before lookahead buffer in concept
+	if(startIndexInt >= bufferNumSamples || endIndexInt < 0 )
+	{
+		mCurrentGrainData.mGrainRange.setStart(0);
+		mCurrentGrainData.mGrainRange.setEnd(0);
+		return; //
+	}
+
+
+	// pertains to read index in audio buffer so don't want negative indices
+	if(startIndexInt < 0)
+		startIndexInt = 0;
+
+	// end index is first of buffer, so start should be zero to be valid
+	if( endIndexInt == 0 )
+		startIndexInt = endIndexInt;
+
+	// start is final sample so end should be final sample as well
+	if(startIndexInt == bufferNumSamples - 1)
+		endIndexInt = startIndexInt;
+
+	// clips the range of the current grain should it happen to extend past the end of the lookaheadBuffer
+	// aka partial grain
+	if(endIndexInt >= bufferNumSamples)
+		endIndexInt = bufferNumSamples - 1;
+
+	
+	mCurrentGrainData.mGrainRange.setStart(startIndexInt);
+	mCurrentGrainData.mGrainRange.setEnd(endIndexInt);
+
+}
+
+//==============================================================================
+void Granulator::_updateShiftRange(float detectedPeriod, float shiftRatio)
+{
+
+}
+
+//==============================================================================
+void Granulator::_updateReadRange()
+{
+
+}
+
+//==============================================================================
+void Granulator::_updateWriteRange()
+{
+
 }

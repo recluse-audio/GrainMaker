@@ -48,8 +48,10 @@ Didn't push to remote often enough,
 ### 2025-06-07 ###
 - [x] getRangeAsAudioBlock()
 - [x] writeBlockToRangeInBuffer()
-- [ ] calculateShiftOffset()
-- [ ] calculateReadRange()
+- [x] calculateShiftOffset()
+- [ ] updateReadRange()
 - [ ] calculateWriteRange()
 - [ ] _windowIndexAtIndexInPeriod()
 - [ ] _getWindowedGrainRangeAsBlock()
+
+- Need to make sure I am updating lookaheadBuffer read position correctly
