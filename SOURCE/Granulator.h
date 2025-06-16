@@ -61,6 +61,12 @@ private:
 	{
 		// Range of lookaheadBuffer
 		juce::Range<juce::int64> mSourceRange	 { 0, 0 };
+		// Range of outputBuffer, 0 -> outputBuffer.getNumSamples()
+		juce::Range<juce::int64> mOutputRange 	{ 0, 0 };
+		//
+		juce::Range<juce::int64> mOutputRangeInSource { 0, 0 };
+		// Range of outputBuffer relative to lookaheadBuffer, with no shifiting it should start at mLookaheadSamples and end at mSourceRange.getEnd()
+		juce::Range<juce::int64> mShiftedOutputRangeInSource 	{ 0, 0 };
 		// Range in lookaheadBuffer that is considered the current "grain" of audio data that will be shifted if necessary
 		juce::Range<juce::int64> mFullGrainRange { 0, 0 };
 		// Range for portion of mFullGrainRange that is within lookahead
@@ -71,6 +77,8 @@ private:
 		juce::Range<juce::int64> mReadRange      { 0, 0 };
 		// Would mShiftedRange be written to outputBuffer after considering the lookahead num samples
 		juce::Range<juce::int64> mWriteRange     { 0, 0 };
+
+		double mNumGrainsToOutput = 0.0;
 	};
 	GrainData mCurrentGrainData;
 
@@ -98,13 +106,26 @@ private:
 	// rounds float values down and returns juce::int64
 	juce::int64 _calculatePitchShiftOffset(float detectedPeriod, float shiftRatio);
 
+
+	juce::int64 _calculateFirstIndexToOutput(float shiftRatio);
+
 	// Float indices get converted to juce::int64 in these functions
 	// fix or optimize them here and don't worry about chasing them down all over the repo
+
+	/* These update every processBlock() */
 	void _updateSourceRange(const juce::AudioBuffer<float>& lookaheadBuffer);
+	void _updateOutputRange(const juce::AudioBuffer<float>& outputBuffer);
+	void _updateNumGrainsToOutput(float detectedPeriod, float shiftRatio);
+	void _updateOutputRangeInSource();
+	void _updateShiftedOutputRangeInSource();
+	/*----- end of functions that are per-block -----------*/
+
+	/*---------- These are done once per grain ------------*/
 	void _updateFullGrainRange(float startIndex, float detectedPeriod);
 	void _updateClippedGrainRange();
-	void _updateShiftRange(float detectedPeriod, float shiftRatio);
-	void _updateReadRange();
-	// Would mShiftedRange be written to outputBuffer after considering the lookahead num samples
+	void _updateShiftedRange(float detectedPeriod, float shiftRatio);
 	void _updateWriteRange();
+	void _updateReadRange();
+	/*-------- end of functions that are per-grain -----------*/
+
 };

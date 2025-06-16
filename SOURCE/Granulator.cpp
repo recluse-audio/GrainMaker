@@ -217,6 +217,40 @@ void Granulator::_updateSourceRange(const juce::AudioBuffer<float>& lookaheadBuf
 }
 
 //==============================================================================
+void Granulator::_updateOutputRange(const juce::AudioBuffer<float>& outputBuffer)
+{
+	mCurrentGrainData.mOutputRange.setStart( 0 );
+	mCurrentGrainData.mOutputRange.setEnd( (juce::int64) (outputBuffer.getNumSamples() - 1) );
+}
+
+//==============================================================================
+//------------------------------------------------------------------------------
+void Granulator::_updateNumGrainsToOutput(float detectedPeriod, float shiftRatio)
+{
+	double noShiftNumGrains = (double)(mCurrentGrainData.mOutputRange.getLength() + 1) / (double) detectedPeriod;
+	mCurrentGrainData.mNumGrainsToOutput = noShiftNumGrains * (double)shiftRatio;
+}
+//==============================================================================
+
+
+//==============================================================================
+void Granulator::_updateOutputRangeInSource()
+{
+	juce::int64 startInSource = mCurrentGrainData.mSourceRange.getLength() - mCurrentGrainData.mOutputRange.getLength();
+	juce::int64 endInSource = mCurrentGrainData.mOutputRange.getLength() + startInSource;
+	mCurrentGrainData.mOutputRangeInSource.setStart(startInSource);
+	mCurrentGrainData.mOutputRangeInSource.setEnd(endInSource);
+}
+
+//==============================================================================
+void Granulator::_updateShiftedOutputRangeInSource()
+{
+
+}
+
+
+
+//==============================================================================
 void Granulator::_updateFullGrainRange(float startIndex, float detectedPeriod)
 {
 	mCurrentGrainData.mFullGrainRange.setStart( (juce::int64)startIndex );
@@ -226,55 +260,15 @@ void Granulator::_updateFullGrainRange(float startIndex, float detectedPeriod)
 //==============================================================================
 void Granulator::_updateClippedGrainRange()
 {
-	// juce::int64 startIndexInt = (juce::int64)startIndex;
-	// juce::int64 endIndexInt = (juce::int64)detectedPeriod + startIndexInt;
-	// juce::int64 bufferNumSamples = (juce::int64)lookaheadBuffer.getNumSamples();
-
-	// juce::Range<juce::int64> fullGrainRange;
-	// fullGrainRange.setStart(startIndexInt); 
-	// fullGrainRange.setEnd(endIndexInt);
-
-	// juce::Range<juce::int64> fullBufferRange;
-	// fullBufferRange.setStart(0);
-	// fullBufferRange.setEnd(bufferNumSamples-1);
-
-	// mCurrentGrainData.mFullGrainRange = fullGrainRange.getIntersectionWith(fullBufferRange);
-	// // shouldn't happen, equivalent to starting after or ending before lookahead buffer in concept
-	// if(startIndexInt >= bufferNumSamples || endIndexInt < 0 )
-	// {
-	// 	mCurrentGrainData.mFullGrainRange.setStart(0);
-	// 	mCurrentGrainData.mFullGrainRange.setEnd(0);
-	// 	return; //
-	// }
-
-
-	// // pertains to read index in audio buffer so don't want negative indices
-	// if(startIndexInt < 0)
-	// 	startIndexInt = 0;
-
-	// // end index is first of buffer, so start should be zero to be valid
-	// if( endIndexInt == 0 )
-	// 	startIndexInt = endIndexInt;
-
-	// // start is final sample so end should be final sample as well
-	// if(startIndexInt == bufferNumSamples - 1)
-	// 	endIndexInt = startIndexInt;
-
-	// // clips the range of the current grain should it happen to extend past the end of the lookaheadBuffer
-	// // aka partial grain
-	// if(endIndexInt >= bufferNumSamples)
-	// 	endIndexInt = bufferNumSamples - 1;
-
-	
-	// mCurrentGrainData.mFullGrainRange.setStart(startIndexInt);
-	// mCurrentGrainData.mFullGrainRange.setEnd(endIndexInt);
-
+	mCurrentGrainData.mClippedGrainRange = mCurrentGrainData.mFullGrainRange.getIntersectionWith(mCurrentGrainData.mSourceRange);
 }
 
 //==============================================================================
-void Granulator::_updateShiftRange(float detectedPeriod, float shiftRatio)
+void Granulator::_updateShiftedRange(float detectedPeriod, float shiftRatio)
 {
-
+	juce::int64 shiftedOffset = _calculatePitchShiftOffset(detectedPeriod, shiftRatio);
+	juce::int64 shiftedStart = mCurrentGrainData.mClippedGrainRange.getStart() + shiftedOffset;
+	mCurrentGrainData.mShiftedRange = mCurrentGrainData.mClippedGrainRange.movedToStartAt(shiftedStart);
 }
 
 //==============================================================================
