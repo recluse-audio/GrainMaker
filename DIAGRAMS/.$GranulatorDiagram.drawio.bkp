@@ -1,0 +1,34 @@
+<mxfile host="Electron" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/27.0.9 Chrome/134.0.6998.205 Electron/35.4.0 Safari/537.36" version="27.0.9">
+  <diagram name="Page-1" id="cvJ5FM7QaJS0v5Z6GKqa">
+    <mxGraphModel dx="1306" dy="884" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="gou8zPEolvHj935flrQT-1" value="&lt;b&gt;LookaheadBuffer&lt;/b&gt; [1024 samples]" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#9DA937;fontColor=#ffffff;strokeColor=#2D7600;" vertex="1" parent="1">
+          <mxGeometry x="30" y="70" width="300" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="gou8zPEolvHj935flrQT-2" value="&lt;b&gt;OutputBuffer&lt;/b&gt; [512 samples]" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#FF9933;fontColor=#ffffff;strokeColor=#2D7600;" vertex="1" parent="1">
+          <mxGeometry x="170" y="130" width="160" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="gou8zPEolvHj935flrQT-7" value="&lt;font color=&quot;#33001a&quot;&gt;&lt;b&gt;mSourceRange [ 0 , 1023 ]&lt;/b&gt;&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#99CCFF;fontColor=#ffffff;strokeColor=#2D7600;" vertex="1" parent="1">
+          <mxGeometry x="380" y="70" width="160" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="gou8zPEolvHj935flrQT-8" value="&lt;font color=&quot;#33001a&quot;&gt;&lt;b&gt;mOutputRange [ 0 , 511 ]&lt;/b&gt;&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#99CCFF;fontColor=#ffffff;strokeColor=#2D7600;" vertex="1" parent="1">
+          <mxGeometry x="380" y="130" width="160" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="gou8zPEolvHj935flrQT-9" value="&lt;font color=&quot;#33001a&quot;&gt;&lt;b&gt;mOutputRangeInSource [ 511, 1023 ]&lt;/b&gt;&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#99CCFF;fontColor=#ffffff;strokeColor=#2D7600;" vertex="1" parent="1">
+          <mxGeometry x="380" y="190" width="230" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="gou8zPEolvHj935flrQT-11" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=1;entryY=0.5;entryDx=0;entryDy=0;dashed=1;endArrow=none;startFill=0;" edge="1" parent="1" source="gou8zPEolvHj935flrQT-10" target="gou8zPEolvHj935flrQT-12">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="gou8zPEolvHj935flrQT-10" value="&lt;font style=&quot;color: rgb(51, 0, 26);&quot;&gt;This is only changed in relative position when shifting up, we move it &quot;left&quot; to put the extra audio data at the end of the OutputBuffer so we can read through it faster and pitch upward&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#99CCFF;fontColor=#ffffff;strokeColor=#2D7600;opacity=50;gradientColor=none;gradientDirection=radial;" vertex="1" parent="1">
+          <mxGeometry x="790" y="210" width="210" height="110" as="geometry" />
+        </mxCell>
+        <mxCell id="gou8zPEolvHj935flrQT-12" value="&lt;font color=&quot;#33001a&quot;&gt;&lt;b&gt;mShiftedOutputRangeInSource [ 511, 1023 ]&lt;/b&gt;&lt;/font&gt;" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#99CCFF;fontColor=#ffffff;strokeColor=#2D7600;" vertex="1" parent="1">
+          <mxGeometry x="380" y="250" width="280" height="30" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
