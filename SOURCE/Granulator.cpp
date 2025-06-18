@@ -227,6 +227,7 @@ void Granulator::_updateOutputRange(const juce::AudioBuffer<float>& outputBuffer
 //------------------------------------------------------------------------------
 void Granulator::_updateNumGrainsToOutput(float detectedPeriod, float shiftRatio)
 {
+
 	double noShiftNumGrains = (double)(mCurrentGrainData.mOutputRange.getLength() + 1) / (double) detectedPeriod;
 	mCurrentGrainData.mNumGrainsToOutput = noShiftNumGrains * (double)shiftRatio;
 }
@@ -243,9 +244,22 @@ void Granulator::_updateOutputRangeInSource()
 }
 
 //==============================================================================
-void Granulator::_updateShiftedOutputRangeInSource()
+void Granulator::_updateShiftedOutputRangeInSource(float shiftRatio)
 {
+	juce::int64 startInSource = mCurrentGrainData.mOutputRangeInSource.getStart();
+	juce::int64 outputLength = mCurrentGrainData.mOutputRangeInSource.getLength();
+	float floatStartInSource = (float)startInSource;
+	float floatOutputLength = (float)outputLength;
 
+	// If shifting up we will take excess source audio data and create extra grains out of it to produce the shift up effect
+	juce::int64 sourceLengthNeededForShifting = (juce::int64)(floatOutputLength * shiftRatio);
+
+	juce::int64 shiftOffset = sourceLengthNeededForShifting - outputLength;
+	juce::int64 shiftedStart = startInSource - shiftOffset;
+
+	mCurrentGrainData.mShiftedOutputRangeInSource.setStart(shiftedStart);
+	mCurrentGrainData.mShiftedOutputRangeInSource.setLength(sourceLengthNeededForShifting);
+	
 }
 
 

@@ -36,7 +36,7 @@ public:
 	void updateOutputRange(const juce::AudioBuffer<float>& outputBuffer) { mGranulator._updateOutputRange(outputBuffer); }
 	void updateNumGrainsToOutput(float detectedPeriod, float shiftRatio) { mGranulator._updateNumGrainsToOutput(detectedPeriod, shiftRatio); }
 	void updateOutputRangeInSource() { mGranulator._updateOutputRangeInSource(); }
-	void updateShiftedOutputRangeInSource() { mGranulator._updateShiftedOutputRangeInSource(); }
+	void updateShiftedOutputRangeInSource(float shiftRatio) { mGranulator._updateShiftedOutputRangeInSource(shiftRatio); }
 	void updateFullGrainRange(float startIndex, float lengthInSamples)	{ mGranulator._updateFullGrainRange(startIndex, lengthInSamples); }
 	void updateClippedGrainRange() { mGranulator._updateClippedGrainRange(); }
 	void updateShiftedRange(float detectedPeriod, float shiftRatio) { mGranulator._updateShiftedRange(detectedPeriod, shiftRatio); }
@@ -145,19 +145,20 @@ TEST_CASE("Granulator::mCurrentGrain::mOutputRangeInSource is updated correctly"
 //
 TEST_CASE("Granulator::mCurrentGrain::mShiftedOutputRangeInSource is updated correctly")
 {
-	// Granulator granulator;
-	// GranulatorTester granulatorTester(granulator);
-	// juce::AudioBuffer<float> lookaheadBuffer (1, 100);
-	// juce::AudioBuffer<float> outputBuffer (1, 50);
+	Granulator granulator;
+	GranulatorTester granulatorTester(granulator);
+	juce::AudioBuffer<float> lookaheadBuffer (1, 100);
+	juce::AudioBuffer<float> outputBuffer (1, 50);
 
-	// granulatorTester.updateSourceRange(lookaheadBuffer);
-	// granulatorTester.updateOutputRange(outputBuffer);
-	// granulatorTester.updateOutputRangeInSource();
-	// granulatorTester.updateShiftedOutputRangeInSource(2.f)
+	granulatorTester.updateSourceRange(lookaheadBuffer);
+	granulatorTester.updateOutputRange(outputBuffer);
+	granulatorTester.updateOutputRangeInSource();
+	granulatorTester.updateShiftedOutputRangeInSource(2.f);
 
-	// juce::Range<juce::int64> range = granulatorTester.getShiftedOutputRangeInSource();
-	// CHECK(range.getStart() == (juce::int64)0);
-	// CHECK(range.getEnd() == (juce::int64)outputBuffer.getNumSamples() - 1);
+	// this is max shifting in this scenario, in which we'd use up the entire looka ahead for the sake of shifting up
+	juce::Range<juce::int64> range = granulatorTester.getShiftedOutputRangeInSource();
+	CHECK(range.getStart() == (juce::int64)1);
+	CHECK(range.getLength() == granulatorTester.getSourceRange().getLength() - 1); // could arrange to not drop this sample, but it prevents aliasing in theory
 
 }
 

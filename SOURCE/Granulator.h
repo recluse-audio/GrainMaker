@@ -112,12 +112,13 @@ private:
 	// Float indices get converted to juce::int64 in these functions
 	// fix or optimize them here and don't worry about chasing them down all over the repo
 
+	
 	/* These update every processBlock() */
 	void _updateSourceRange(const juce::AudioBuffer<float>& lookaheadBuffer);
 	void _updateOutputRange(const juce::AudioBuffer<float>& outputBuffer);
 	void _updateNumGrainsToOutput(float detectedPeriod, float shiftRatio);
 	void _updateOutputRangeInSource();
-	void _updateShiftedOutputRangeInSource();
+	void _updateShiftedOutputRangeInSource(float shiftRatio);
 	/*----- end of functions that are per-block -----------*/
 
 	/*---------- These are done once per grain ------------*/
