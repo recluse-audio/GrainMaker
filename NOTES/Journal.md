@@ -55,3 +55,7 @@ Didn't push to remote often enough,
 - [ ] _getWindowedGrainRangeAsBlock()
 
 - Need to make sure I am updating lookaheadBuffer read position correctly
+
+
+### 2025-06-08 ###
+New strategy is to calculate a series of juce::Ranges similar to how I did with ARA. Then convert them to juce::AudioBlocks as appropriate. Most of the calculation is figuring out what to write and where
