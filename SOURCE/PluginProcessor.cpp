@@ -103,12 +103,13 @@ void PluginProcessor::changeProgramName (int index, const juce::String& newName)
 //==============================================================================
 void PluginProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
-	int lookahead = 256;
+	int lookahead = samplesPerBlock;
 
 	mLookaheadBuffer.clear();
-	mLookaheadBuffer.setSize(this->getNumInputChannels(), samplesPerBlock + lookahead);
+	mLookaheadBuffer.setSize(this->getNumOutputChannels(), samplesPerBlock + lookahead);
 
-    mPitchDetector->prepareToPlay(sampleRate, samplesPerBlock + lookahead);
+    // mPitchDetector->prepareToPlay(sampleRate, samplesPerBlock + lookahead);
+    mPitchDetector->prepareToPlay(sampleRate, samplesPerBlock);
 	
     // mPMCBuffer->prepare(sampleRate, samplesPerBlock);
     // mPMCBuffer->setSize(this->getNumOutputChannels(), (int)sampleRate); // by default 1 second
@@ -116,7 +117,7 @@ void PluginProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     // mGrainCorrector->prepare(sampleRate, samplesPerBlock);
     // mGrainCorrector->setOutputDelay(samplesPerBlock);
 
-    mCircularBuffer->setSize(this->getNumOutputChannels(), (int)sampleRate); // by default 1 second
+    mCircularBuffer->setSize(this->getNumOutputChannels(), (int)sampleRate * 2); // by default 1 second
     mCircularBuffer->setDelay(lookahead);
 
     mGranulator->prepare(sampleRate);
@@ -164,9 +165,24 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     auto totalNumInputChannels  = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
 
-    mCircularBuffer->pushBuffer(buffer);
+    bool writeSuccess = mCircularBuffer->pushBuffer(buffer);
+	if(!writeSuccess)
+		return;
+
 	buffer.clear();
-    mCircularBuffer->popBuffer(mLookaheadBuffer);
+	mLookaheadBuffer.clear();
+    mCircularBuffer->popBufferWithLookahead(mLookaheadBuffer, buffer);
+
+	// int sampleOffset = mLookaheadBuffer.getNumSamples() - buffer.getNumSamples();
+
+	// for(int sampleIndex = 0; sampleIndex < buffer.getNumSamples(); sampleIndex++)
+	// {
+	// 	for(int ch = 0; ch < buffer.getNumChannels(); ch++)
+	// 	{
+	// 		float lookaheadSample = mLookaheadBuffer.getSample(ch, sampleIndex);
+	// 		buffer.setSample(ch, sampleIndex, lookaheadSample);
+	// 	}
+	// }
 
     float detected_period = mPitchDetector->process(mLookaheadBuffer);
 	// mGranulator->setEmissionPeriodInSamples(detected_period * mShiftRatio);

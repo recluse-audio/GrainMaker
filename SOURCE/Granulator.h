@@ -66,17 +66,18 @@ private:
 		//
 		juce::Range<juce::int64> mOutputRangeInSource { 0, 0 };
 		// Range of outputBuffer relative to lookaheadBuffer, with no shifiting it should start at mLookaheadSamples and end at mSourceRange.getEnd()
-		juce::Range<juce::int64> mShiftedOutputRangeInSource 	{ 0, 0 };
+		juce::Range<juce::int64> mSourceRangeNeededForShifting 	{ 0, 0 };
 		// Range in lookaheadBuffer that is considered the current "grain" of audio data that will be shifted if necessary
 		juce::Range<juce::int64> mFullGrainRange { 0, 0 };
 		// Range for portion of mFullGrainRange that is within lookahead
 		juce::Range<juce::int64> mClippedGrainRange { 0, 0 };
 		// Where the grain would be after shift offset (lookahead offset not applied yet)
 		juce::Range<juce::int64> mShiftedRange   { 0, 0 };
-		// Range of mGrainRange that will be read to write to outputBuffer (might not read/write entire grain)
-		juce::Range<juce::int64> mReadRange      { 0, 0 };
 		// Would mShiftedRange be written to outputBuffer after considering the lookahead num samples
-		juce::Range<juce::int64> mWriteRange     { 0, 0 };
+		juce::Range<juce::int64> mGrainWriteRange     { 0, 0 };
+		// Range of mGrainRange that will be read to write to outputBuffer (might not read/write entire grain)
+		juce::Range<juce::int64> mGrainReadRange      { 0, 0 };
+
 
 		double mNumGrainsToOutput = 0.0;
 	};
@@ -118,15 +119,21 @@ private:
 	void _updateOutputRange(const juce::AudioBuffer<float>& outputBuffer);
 	void _updateNumGrainsToOutput(float detectedPeriod, float shiftRatio);
 	void _updateOutputRangeInSource();
-	void _updateShiftedOutputRangeInSource(float shiftRatio);
+	void _updateSourceRangeNeededForShifting(float shiftRatio);
 	/*----- end of functions that are per-block -----------*/
 
 	/*---------- These are done once per grain ------------*/
 	void _updateFullGrainRange(float startIndex, float detectedPeriod);
 	void _updateClippedGrainRange();
 	void _updateShiftedRange(float detectedPeriod, float shiftRatio);
-	void _updateWriteRange();
-	void _updateReadRange();
+	void _updateGrainReadRange(juce::Range<juce::int64>& readRange, const juce::Range<juce::int64>& sourceRangeNeededForShifting, float grainNumber, float detectedPeriod);
+	void _updateGrainWriteRange(juce::Range<juce::int64>& writeRange, const juce::Range<juce::int64>& outputRange, float grainNumber, float detectedPeriod, float periodAfterShifting);
+
 	/*-------- end of functions that are per-grain -----------*/
+
+	void _applyWindowToFullGrain(juce::dsp::AudioBlock<float>& block);
+	// this is for the last partial grain that most likely won't finish the window resulting in sharp dropout.
+	// instead fade out quickly
+	void _applyWindowToPartialGrain(juce::dsp::AudioBlock<float>& block);
 
 };

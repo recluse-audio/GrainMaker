@@ -49,7 +49,7 @@ Didn't push to remote often enough,
 - [x] getRangeAsAudioBlock()
 - [x] writeBlockToRangeInBuffer()
 - [x] calculateShiftOffset()
-- [ ] updateReadRange()
+- [ ] updateGrainReadRange()
 - [ ] calculateWriteRange()
 - [ ] _windowIndexAtIndexInPeriod()
 - [ ] _getWindowedGrainRangeAsBlock()
