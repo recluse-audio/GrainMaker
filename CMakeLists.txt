@@ -46,6 +46,8 @@ set(JUCE_COPY_PLUGIN_AFTER_BUILD ON)
 add_subdirectory(SUBMODULES/JUCE)
 
 
+
+
 # Check the readme at `docs/CMake API.md` in the JUCE repo for full config
 juce_add_plugin("${PROJECT_NAME}"
     # VERSION ...                               # Set this if the plugin version is different to the project version
@@ -140,6 +142,23 @@ if(MSVC)
     endif()
 endif()
 
+#################################################
+############### VERSION NUMBER ##################
+set(VERSION_TXT "${CMAKE_SOURCE_DIR}/VERSION.txt")
+set(VERSION_HEADER "${CMAKE_SOURCE_DIR}/SOURCE/Util/Version.h")
+
+# Define a standalone pre-build step
+add_custom_target(update_version_header
+	COMMAND ${CMAKE_COMMAND} -E echo "Updating version header..."
+	COMMAND ${CMAKE_SOURCE_DIR}/scripts/update_version.py ${VERSION_TXT} ${VERSION_HEADER}
+	COMMENT "Running update_version.py"
+)
+
+# Ensure it runs before building the plugin
+add_dependencies(${PROJECT_NAME} update_version_header)
+##################################################
+##################################################
+
 # Required for ctest (which is just easier for cross-platform CI)
 # include(CTest) does this too, but adds tons of targets we don't want
 # See: https://github.com/catchorg/Catch2/issues/2026
@@ -182,3 +201,5 @@ if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
 elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
    add_compile_options (-fcolor-diagnostics)
 endif ()
+
+

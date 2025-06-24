@@ -1,12 +1,24 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 
+#include "Util/Version.h"
+
+juce::String getBuildVersion()
+{
+	//return juce::String(BUILD_VERSION);
+	return BUILD_VERSION_STRING;
+}
+
 //==================================
 PluginEditor::PluginEditor (PluginProcessor& p)
 : AudioProcessorEditor (&p)
 , mProcessor (p)
 {
 	// INIT LABELS
+	mVersionLabel = std::make_unique<juce::Label>();
+	mVersionLabel->setText(getBuildVersion(), juce::NotificationType::dontSendNotification);
+	addAndMakeVisible(mVersionLabel.get());
+
 	mPitchDisplayLabel = std::make_unique<juce::Label>();
 	mPitchDisplayLabel->setText("Detected Pitch", juce::NotificationType::dontSendNotification);
 	addAndMakeVisible(mPitchDisplayLabel.get());
@@ -37,6 +49,7 @@ PluginEditor::PluginEditor (PluginProcessor& p)
 
 	// BOUNDS
 	this->setSize(400, 400);
+	mVersionLabel->setBounds(10, 350, 60, 12);
 	mPitchDisplayLabel->setBounds(100, 50, 100, 30);
 	mPitchDisplay->setBounds(100, 100, 100, 30);
 

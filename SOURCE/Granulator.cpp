@@ -19,14 +19,8 @@ Granulator::~Granulator()
 //
 void Granulator::prepare(double sampleRate)
 {
-    if(sampleRate != mSampleRate)
-    {
-		mWindow.setSizeShapePeriod(sampleRate, Window::Shape::kHanning, sampleRate);
-
-
-        mSampleRate = sampleRate;
-
-    }
+	mWindow.setSizeShapePeriod(sampleRate, Window::Shape::kHanning, sampleRate);
+    mSampleRate = sampleRate;
 }
 
 //
@@ -138,53 +132,70 @@ void Granulator::processShifting(juce::AudioBuffer<float>& lookaheadBuffer, juce
 	int numWholeGrains = (int) mCurrentGrainData.mNumGrainsToOutput;
 	float numPartialGrains = (float)mCurrentGrainData.mNumGrainsToOutput - (float)numWholeGrains;
 
-	// declare read/write ranges, read entirety of mSourceRangeNeededForShifting, fit/stretch it to fit outputbuffer
-	// Always start with whole grain, put partial at end (current theory, not set in stone)
-	juce::Range<juce::int64> readRange;
-	readRange.setStart(mCurrentGrainData.mSourceRangeNeededForShifting.getStart());
-	readRange.setLength((juce::int64)detectedPeriod);
-
-	juce::Range<juce::int64> writeRange;
-	writeRange.setStart(0);
-	writeRange.setLength((juce::int64)detectedPeriod);
-
-	// do first grain fully, starting at index 0 of outputBuffer
-	// next grains will come earlier/later than expected if shifting up/down
-	auto firstBlock = BufferHelper::getRangeAsBlock(lookaheadBuffer, readRange);
-	_applyWindowToFullGrain(firstBlock);
-	BufferHelper::writeBlockToBuffer(outputBuffer, firstBlock, writeRange);
 
 	juce::int64 shiftOffset = _calculatePitchShiftOffset(detectedPeriod, shiftRatio);
 
-	for(juce::int64 grainNumber = 1; grainNumber < numWholeGrains; grainNumber++)
+	juce::Range<juce::int64> readRange;
+	juce::Range<juce::int64> writeRange;
+	float periodAfterShifting = detectedPeriod * (1.f / shiftRatio);
+
+	for(juce::int64 grainNumber = 0; grainNumber < numWholeGrains; grainNumber++)
 	{
-		juce::int64 oldReadEnd = readRange.getEnd();
-		readRange.setStart(oldReadEnd + 1);
+		_updateGrainReadRange(readRange, mCurrentGrainData.mSourceRangeNeededForShifting, grainNumber, detectedPeriod);
+		_updateGrainWriteRange(writeRange, mCurrentGrainData.mOutputRange, grainNumber, detectedPeriod, periodAfterShifting);
 
-		juce::int64 oldWriteEnd = writeRange.getEnd();
-		writeRange.setEnd(oldWriteEnd + 1 - shiftOffset);
-
-		auto readBlock = BufferHelper::getRangeAsBlock(lookaheadBuffer, readRange);
+		juce::dsp::AudioBlock<float> readBlock = BufferHelper::getRangeAsBlock(lookaheadBuffer, readRange);
 		_applyWindowToFullGrain(readBlock);
 		BufferHelper::writeBlockToBuffer(outputBuffer, readBlock, writeRange);
 
 	}
-	
-	{ // last block
-		juce::int64 oldReadEnd = readRange.getEnd();
-		readRange.setStart(oldReadEnd + 1);
 
-		juce::int64 oldWriteEnd = writeRange.getEnd();
-		writeRange.setEnd(oldWriteEnd + 1 - shiftOffset);
+		_updateGrainReadRange(readRange, mCurrentGrainData.mSourceRangeNeededForShifting, mCurrentGrainData.mNumGrainsToOutput - 1.f, detectedPeriod);
+		_updateGrainWriteRange(writeRange, mCurrentGrainData.mOutputRange, mCurrentGrainData.mNumGrainsToOutput - 1.f, detectedPeriod, periodAfterShifting);
+		juce::dsp::AudioBlock<float> readBlock = BufferHelper::getRangeAsBlock(lookaheadBuffer, readRange);
 
-		auto lastBlock = BufferHelper::getRangeAsBlock(lookaheadBuffer, readRange);
-		_applyWindowToPartialGrain(lastBlock);
-		BufferHelper::writeBlockToBuffer(outputBuffer, lastBlock, writeRange);
-	}
+		_applyWindowToPartialGrain(readBlock);
+		BufferHelper::writeBlockToBuffer(outputBuffer, readBlock, writeRange);
 
-
+		// juce::dsp::AudioBlock<float> outputBlock = BufferHelper::getRangeAsBlock(outputBuffer, mCurrentGrainData.mOutputRange);
+		// _applyWindowToFullGrain(outputBlock);
 
 } 
+
+
+
+//==============================================================================
+void Granulator::_updateGrainReadRange(juce::Range<juce::int64>& readRange, const juce::Range<juce::int64>& sourceRangeNeededForShifting, float grainNumber, float detectedPeriod)
+{
+	juce::int64 startOfSourceRange = sourceRangeNeededForShifting.getStart();
+	juce::int64 offsetDueToGrainNumber = (juce::int64)(grainNumber * detectedPeriod);
+	juce::int64 length = (juce::int64)detectedPeriod;
+
+	readRange.setStart(startOfSourceRange + offsetDueToGrainNumber);
+	readRange.setLength(length);
+
+	if(readRange.getEnd() >= sourceRangeNeededForShifting.getEnd())
+		readRange.setEnd(sourceRangeNeededForShifting.getEnd());
+
+}
+
+//==============================================================================
+void Granulator::_updateGrainWriteRange(juce::Range<juce::int64>& writeRange, const juce::Range<juce::int64>& outputRange, float grainNumber, float detectedPeriod, float periodAfterShifting)
+{
+	juce::int64 startOfOutputRange = 0; // is this ever not 0? This refers to first index of processBlock(outputRange)
+	juce::int64 offsetDueToGrainNumber = (juce::int64)(grainNumber * periodAfterShifting);
+	juce::int64 length = (juce::int64)detectedPeriod;
+
+	writeRange.setStart(startOfOutputRange + offsetDueToGrainNumber);
+	writeRange.setLength(length);
+
+	if(writeRange.getEnd() >= outputRange.getEnd())
+		writeRange.setEnd(outputRange.getEnd());
+}
+
+
+
+
 
 //=======================
 void Granulator::setGrainShape(Window::Shape newShape)
@@ -196,13 +207,6 @@ void Granulator::setGrainShape(Window::Shape newShape)
 
 
 
-
-//=================
-//
-juce::Range<juce::int64> Granulator::_getGrainRangeOverlappingOutput(juce::Range<juce::int64> rangeInLookahead, juce::Range<juce::int64> totalOutputRange, float shiftOffset)
-{
-
-}
 
 //=================
 // TODO: return a float here and get an interpolated sample for that last partial value
@@ -299,34 +303,7 @@ void Granulator::_updateShiftedRange(float detectedPeriod, float shiftRatio)
 
 
 
-//==============================================================================
-void Granulator::_updateGrainReadRange(juce::Range<juce::int64>& readRange, const juce::Range<juce::int64>& sourceRangeNeededForShifting, float grainNumber, float detectedPeriod)
-{
-	juce::int64 startOfSourceRange = sourceRangeNeededForShifting.getStart();
-	juce::int64 offsetDueToGrainNumber = (juce::int64)(grainNumber * detectedPeriod);
-	juce::int64 length = (juce::int64)detectedPeriod;
 
-	readRange.setStart(startOfSourceRange + offsetDueToGrainNumber);
-	readRange.setLength(length);
-
-	if(readRange.getEnd() >= sourceRangeNeededForShifting.getEnd())
-		readRange.setEnd(sourceRangeNeededForShifting.getEnd());
-
-}
-
-//==============================================================================
-void Granulator::_updateGrainWriteRange(juce::Range<juce::int64>& writeRange, const juce::Range<juce::int64>& outputRange, float grainNumber, float detectedPeriod, float periodAfterShifting)
-{
-	juce::int64 startOfOutputRange = 0; // is this ever not 0? This refers to first index of processBlock(outputRange)
-	juce::int64 offsetDueToGrainNumber = (juce::int64)(grainNumber * periodAfterShifting);
-	juce::int64 length = (juce::int64)detectedPeriod;
-
-	writeRange.setStart(startOfOutputRange + offsetDueToGrainNumber);
-	writeRange.setLength(length);
-
-	if(writeRange.getEnd() >= outputRange.getEnd())
-		writeRange.setEnd(outputRange.getEnd());
-}
 
 
 
@@ -377,9 +354,9 @@ void Granulator::_applyWindowToFullGrain(juce::dsp::AudioBlock<float>& block)
 //===============================================================================
 void Granulator::_applyWindowToPartialGrain(juce::dsp::AudioBlock<float>& block)
 {
-	int fadeOutSamples = (int)(mSampleRate * 0.01f);
+	int fadeOutSamples = 100;
 	float fadeOutValue = 1.f;
-	float fadeOutIncrement = 1.f / (float)fadeOutSamples;
+	float fadeOutIncrement = 0.01f;
 
 	for(int sampleIndex = 0; sampleIndex < block.getNumSamples(); sampleIndex++)
 	{
