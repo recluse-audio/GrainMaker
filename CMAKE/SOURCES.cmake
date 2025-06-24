@@ -20,6 +20,7 @@ set(SOURCES
     SOURCE/PluginProcessor.cpp
     SOURCE/PluginProcessor.h
     SOURCE/Util/Juce_Header.h
+    SOURCE/Util/Version.h
     SUBMODULES/RD/SOURCE/AudioFileHelpers.h
     SUBMODULES/RD/SOURCE/AudioFileProcessor.cpp
     SUBMODULES/RD/SOURCE/AudioFileProcessor.h

@@ -18,6 +18,7 @@ public:
 
 private:
 	PluginProcessor& mProcessor;
+    std::unique_ptr<juce::Label> mVersionLabel;
 
     std::unique_ptr<juce::Label> mPitchDisplayLabel;
     std::unique_ptr<juce::Label> mShiftRatioLabel;
