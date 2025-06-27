@@ -54,6 +54,12 @@ private:
     double mSampleRate = -1;
     Window mWindow;
 
+	// partial grains extending beyond the bounds of the outputBuffer get written here, in the next block they are written at the start
+	juce::AudioBuffer<float> mSpilloverBuffer;
+
+	// spillover is larger than even the longest grain, so track how far the spillover grains actually go into the next outputBuffer.
+	// This is the end position of the last grain that spilled over from the previous processBlock
+	juce::int64 mSpilloverLength = 0; 
 	/** 
 	 * @brief These Ranges get used ever processBlock so it made sense to make them member variables
 	 */
@@ -107,8 +113,15 @@ private:
 	// rounds float values down and returns juce::int64
 	juce::int64 _calculatePitchShiftOffset(float detectedPeriod, float shiftRatio);
 
-
 	juce::int64 _calculateFirstIndexToOutput(float shiftRatio);
+
+	// the first two range args are used to calculate then modify the second two
+	void _getWriteRangeInOutputAndSpillover(const juce::Range<juce::int64>& wholeGrainRange,
+											const juce::Range<juce::int64>& outputRange,
+											juce::Range<juce::int64>& grainRangeForOutputBuffer,
+											juce::Range<juce::int64>& grainRangeForSpilloverBuffer,
+											juce::Range<juce::int64>& outputBufferWriteRange,
+											juce::Range<juce::int64>& spilloverBufferWriteRange );
 
 	// Float indices get converted to juce::int64 in these functions
 	// fix or optimize them here and don't worry about chasing them down all over the repo
