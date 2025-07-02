@@ -32,7 +32,8 @@ public:
     void setGrainShape(Window::Shape newShape);
 
     void prepare(double sampleRate);
-    const double getCurrentSampleRate();
+    void prepare(double sampleRate, int blockSize);
+	const double getCurrentSampleRate();
 
     void setGrainLengthInMs(double lengthInMs);
     void setGrainLengthInSamples(int numSamples);
@@ -133,6 +134,10 @@ private:
 	void _updateNumGrainsToOutput(float detectedPeriod, float shiftRatio);
 	void _updateOutputRangeInSource();
 	void _updateSourceRangeNeededForShifting(float shiftRatio);
+	// take the fractional num grains needed for pitch shifting and add one to be sure we have enough data
+	void _getSourceRangeNeededForNumGrains(int numGrains, float detectedPeriod
+											, const juce::Range<juce::int64>& sourceRange
+											, juce::Range<juce::int64>& sourceRangeForShifting);
 	/*----- end of functions that are per-block -----------*/
 
 	/*---------- These are done once per grain ------------*/

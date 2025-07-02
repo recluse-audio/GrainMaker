@@ -72,6 +72,20 @@ public:
 		mGranulator._getWriteRangeInOutputAndSpillover(wholeGrainRange, outputRange, grainRangeForOutputBuffer, grainRangeForSpilloverBuffer, outputBufferWriteRange, spilloverBufferWriteRange);
 	}
 
+	void getSourceRangeNeededForNumGrains(int numGrains, float detectedPeriod
+											, const juce::Range<juce::int64>& sourceRange
+											, juce::Range<juce::int64>& sourceRangeForShifting)
+	{
+		mGranulator._getSourceRangeNeededForNumGrains(numGrains, detectedPeriod, sourceRange, sourceRangeForShifting);
+	}
+
+
+	//===========
+	float getWindowSampleAtIndexInPeriod(int indexInPeriod, float period)
+	{
+		return mGranulator._getWindowSampleAtIndexInPeriod(indexInPeriod, period);
+	}
+
 	// getters for GrainData ranges used to read/write shifted grains
 	juce::Range<juce::int64>& getSourceRange()       			{ return mGranulator.mCurrentGrainData.mSourceRange; }
 	juce::Range<juce::int64>& getOutputRange()       			{ return mGranulator.mCurrentGrainData.mOutputRange; }
@@ -91,6 +105,99 @@ private:
 };
 
 
+//========================================
+//
+TEST_CASE("Process Shifting")
+{
+	Granulator granulator;
+	GranulatorTester granulatorTester(granulator);
+	juce::AudioBuffer<float> lookaheadBuffer (1, 1024);
+	juce::AudioBuffer<float> outputBuffer (1, 512);
+
+	lookaheadBuffer.clear();
+	outputBuffer.clear();
+
+
+	double sampleRate = 44100; // need this to prepare
+	int blockSize = outputBuffer.getNumSamples();
+	granulator.prepare(sampleRate, blockSize);
+
+	SECTION("No shifting, no window, incremental lookahead buffer")
+	{
+		granulator.setGrainShape(Window::Shape::kNone);
+		BufferFiller::fillIncremental(lookaheadBuffer);
+
+		float detectedPeriod = 128.f;
+		float shiftRatio = 1.f;
+
+		granulator.processShifting(lookaheadBuffer, outputBuffer, detectedPeriod, shiftRatio);
+
+
+		for(int sampleIndex = 0; sampleIndex < outputBuffer.getNumSamples(); sampleIndex++)
+		{
+
+			for(int ch = 0; ch < outputBuffer.getNumChannels(); ch++)
+			{
+				float indexOffset = (float)outputBuffer.getNumSamples() - detectedPeriod;
+				float outputSample = outputBuffer.getSample(ch, sampleIndex);
+				float expectedValue = (float)sampleIndex + indexOffset;
+
+				//if(expectedValue != 511.f && expectedValue != 639.f && expectedValue != 767.f && expectedValue != 895.f)
+				CHECK(outputSample == expectedValue);
+			}
+		}
+
+	}
+
+	SECTION("No shifting buffer of all ones results in cycles of window values written to outputBuffer")
+	{
+		// BufferFiller::fillWithAllOnes(lookaheadBuffer);
+
+		// float detectedPeriod = 128.f;
+		// float shiftRatio = 1.f;
+
+		// granulator.processShifting(lookaheadBuffer, outputBuffer, detectedPeriod, shiftRatio);
+
+		// int indexInPeriod = 0;
+
+		// for(int sampleIndex = 0; sampleIndex < outputBuffer.getNumSamples(); sampleIndex++)
+		// {
+
+		// 	float windowValue = granulatorTester.getWindowSampleAtIndexInPeriod(indexInPeriod, detectedPeriod);
+
+		// 	indexInPeriod++;
+		// 	if(indexInPeriod >= (int)detectedPeriod)
+		// 		indexInPeriod = 0;
+
+		// 	for(int ch = 0; ch < outputBuffer.getNumChannels(); ch++)
+		// 	{
+		// 		float outputSample = outputBuffer.getSample(ch, sampleIndex);
+		// 		CHECK(outputSample == Catch::Approx(windowValue).epsilon(0.1));
+		// 	}
+		// }
+	}
+
+
+}
+
+//=======================================
+//
+TEST_CASE("Get Source range needed for shifting by number of grains")
+{
+	Granulator granulator;
+	GranulatorTester granulatorTester(granulator);
+	juce::Range<juce::int64> fullSourceRange(0, 99);
+	float detectedPeriod = 10.f;
+	int numGrains = 6;
+	juce::Range<juce::int64> rangeNeededForShifting;
+
+	granulatorTester.getSourceRangeNeededForNumGrains(numGrains, detectedPeriod, fullSourceRange, rangeNeededForShifting);
+
+	CHECK(rangeNeededForShifting.getStart() == 40);
+	CHECK(rangeNeededForShifting.getEnd() == 99);
+
+
+}
 
 //=======================================
 //
@@ -99,7 +206,7 @@ TEST_CASE("Can handle grains that cross processBlocks")
 	Granulator granulator;
 	GranulatorTester granulatorTester(granulator);
 
-	juce::Range<juce::int64> outputRange(0, 100);
+	juce::Range<juce::int64> outputRange(0, 99);
 	SECTION("grain fully in outputBuffer, none in spillover")
 	{
 		juce::Range<juce::int64> wholeGrainRange(0, 9);
