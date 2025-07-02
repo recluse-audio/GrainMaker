@@ -38,7 +38,7 @@ PluginProcessor::~PluginProcessor()
 //==============================================================================
 const juce::String PluginProcessor::getName() const
 {
-    return JucePlugin_Name;
+    return "ArtieTune";
 }
 
 bool PluginProcessor::acceptsMidi() const
@@ -120,7 +120,7 @@ void PluginProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     mCircularBuffer->setSize(this->getNumOutputChannels(), (int)sampleRate * 2); // by default 1 second
     mCircularBuffer->setDelay(lookahead);
 
-    mGranulator->prepare(sampleRate);
+    mGranulator->prepare(sampleRate, samplesPerBlock);
 
     // mGranulator->setEmissionPeriodInSamples(44100);
     // mGranulator->setGrainLengthInSamples(44100);
