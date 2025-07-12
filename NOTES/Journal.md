@@ -59,3 +59,19 @@ Didn't push to remote often enough,
 
 ### 2025-06-08 ###
 New strategy is to calculate a series of juce::Ranges similar to how I did with ARA. Then convert them to juce::AudioBlocks as appropriate. Most of the calculation is figuring out what to write and where
+
+### 2025-07-12 ###
+I've been working, but not taking notes, don't worry. 
+
+At this point I am pitch shifting, but clearly have an issue with the grains that overlap one
+process block to the next.  This is made clear by the effect corresponding with the block size.  But it is pitch shifting. So the problem lay in overlaps.
+
+I started using an overlap buffer per gpt advice. Technically needs to be just long enough to hold the largest possible pitch period - 1
+
+I made tests of `processShifting()` using incremental buffers and was able to get a clear picture of expected sample indices after shifting. All in all I found I am dropping or adding a sample somewhere, and the chain of confusion runs deep.
+
+The fundamental issue is that `juce::Range::getLength()` and `juce::AudioBuffer::getNumSamples()` don't line up in the way you think. The range sets it's end at startIndex + length. If you use buffer num samples you'd take a buffer with 1024 samples and read to the index [1024] which is out of range relative to the buffer.
+
+So I created a class in the `RD` repo called `BufferRange`. Not complicated at all, but ending confusion 4ever I hope.
+
+In process of making tests for that and then replacing it everywhere I use juce::Range.... eek
