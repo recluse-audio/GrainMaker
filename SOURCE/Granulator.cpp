@@ -186,7 +186,7 @@ void Granulator::processShifting(juce::AudioBuffer<float>& lookaheadBuffer, juce
 
 		// this is the whole grain, part of it might get written to spillover
 		// juce::dsp::AudioBlock<float> grainReadBlock = BufferHelper::getRangeAsBlock(lookaheadBuffer, readRange);
-		juce::dsp::AudioBlock<float> grainReadBlock = lookaheadBlock.getSubBlock(readRange.getStart(), readRange.getLength());
+		juce::dsp::AudioBlock<float> grainReadBlock = lookaheadBlock.getSubBlock(readRange.getStart(), readRange.getLength() + 1);
 		_applyWindowToFullGrain(grainReadBlock);
 	
 
