@@ -10,9 +10,11 @@
  */
 
 
- #pragma once
- #include "Util/Juce_Header.h"
+#pragma once
+#include "Util/Juce_Header.h"
 #include "../SUBMODULES/RD/SOURCE/Window.h"
+#include "../SUBMODULES/RD/SOURCE/BufferRange.h"
+
 
  /**
   * @brief You pump in audio to this class, it chops it up into grains.
@@ -67,23 +69,23 @@ private:
 	struct GrainData
 	{
 		// Range of lookaheadBuffer
-		juce::Range<juce::int64> mSourceRange	 { 0, 0 };
+		RD::BufferRange mSourceRange	 { 0, 0 };
 		// Range of outputBuffer, 0 -> outputBuffer.getNumSamples()
-		juce::Range<juce::int64> mOutputRange 	{ 0, 0 };
+		RD::BufferRange mOutputRange 	{ 0, 0 };
 		//
-		juce::Range<juce::int64> mOutputRangeInSource { 0, 0 };
+		RD::BufferRange mOutputRangeInSource { 0, 0 };
 		// Range of outputBuffer relative to lookaheadBuffer, with no shifiting it should start at mLookaheadSamples and end at mSourceRange.getEnd()
-		juce::Range<juce::int64> mSourceRangeNeededForShifting 	{ 0, 0 };
+		RD::BufferRange mSourceRangeNeededForShifting 	{ 0, 0 };
 		// Range in lookaheadBuffer that is considered the current "grain" of audio data that will be shifted if necessary
-		juce::Range<juce::int64> mFullGrainRange { 0, 0 };
+		RD::BufferRange mFullGrainRange { 0, 0 };
 		// Range for portion of mFullGrainRange that is within lookahead
-		juce::Range<juce::int64> mClippedGrainRange { 0, 0 };
+		RD::BufferRange mClippedGrainRange { 0, 0 };
 		// Where the grain would be after shift offset (lookahead offset not applied yet)
-		juce::Range<juce::int64> mShiftedRange   { 0, 0 };
+		RD::BufferRange mShiftedRange   { 0, 0 };
 		// Would mShiftedRange be written to outputBuffer after considering the lookahead num samples
-		juce::Range<juce::int64> mGrainWriteRange     { 0, 0 };
+		RD::BufferRange mGrainWriteRange     { 0, 0 };
 		// Range of mGrainRange that will be read to write to outputBuffer (might not read/write entire grain)
-		juce::Range<juce::int64> mGrainReadRange      { 0, 0 };
+		RD::BufferRange mGrainReadRange      { 0, 0 };
 
 
 		double mNumGrainsToOutput = 0.0;
@@ -108,7 +110,7 @@ private:
 	float _getWindowSampleAtIndexInPeriod(int indexInPeriod, float period);
 
 	/** Returns portion of a grain's range that will end up being written to outputBuffer (may be partial), this doesn't write, but tells us what to write and where  */
-	juce::Range<juce::int64> _getGrainRangeOverlappingOutput(juce::Range<juce::int64> rangeInLookahead, juce::Range<juce::int64> totalOutputRange, float shiftOffset);
+	RD::BufferRange _getGrainRangeOverlappingOutput(RD::BufferRange rangeInLookahead, RD::BufferRange totalOutputRange, float shiftOffset);
 
 	// Number of samples to shift grains based on its period and shift ratio.
 	// rounds float values down and returns juce::int64
@@ -117,12 +119,12 @@ private:
 	juce::int64 _calculateFirstIndexToOutput(float shiftRatio);
 
 	// the first two range args are used to calculate then modify the second two
-	void _getWriteRangeInOutputAndSpillover(const juce::Range<juce::int64>& wholeGrainRange,
-											const juce::Range<juce::int64>& outputRange,
-											juce::Range<juce::int64>& grainRangeForOutputBuffer,
-											juce::Range<juce::int64>& grainRangeForSpilloverBuffer,
-											juce::Range<juce::int64>& outputBufferWriteRange,
-											juce::Range<juce::int64>& spilloverBufferWriteRange );
+	void _getWriteRangeInOutputAndSpillover(const RD::BufferRange& wholeGrainRange,
+											const RD::BufferRange& outputRange,
+											RD::BufferRange& grainRangeForOutputBuffer,
+											RD::BufferRange& grainRangeForSpilloverBuffer,
+											RD::BufferRange& outputBufferWriteRange,
+											RD::BufferRange& spilloverBufferWriteRange );
 
 	// Float indices get converted to juce::int64 in these functions
 	// fix or optimize them here and don't worry about chasing them down all over the repo
@@ -136,16 +138,16 @@ private:
 	void _updateSourceRangeNeededForShifting(float shiftRatio);
 	// take the fractional num grains needed for pitch shifting and add one to be sure we have enough data
 	void _getSourceRangeNeededForNumGrains(int numGrains, float detectedPeriod
-											, const juce::Range<juce::int64>& sourceRange
-											, juce::Range<juce::int64>& sourceRangeForShifting);
+											, const RD::BufferRange& sourceRange
+											, RD::BufferRange& sourceRangeForShifting);
 	/*----- end of functions that are per-block -----------*/
 
 	/*---------- These are done once per grain ------------*/
 	void _updateFullGrainRange(float startIndex, float detectedPeriod);
 	void _updateClippedGrainRange();
 	void _updateShiftedRange(float detectedPeriod, float shiftRatio);
-	void _updateGrainReadRange(juce::Range<juce::int64>& readRange, const juce::Range<juce::int64>& sourceRangeNeededForShifting, float grainNumber, float detectedPeriod);
-	void _updateGrainWriteRange(juce::Range<juce::int64>& writeRange, const juce::Range<juce::int64>& outputRange, float grainNumber, float detectedPeriod, float periodAfterShifting);
+	void _updateGrainReadRange(RD::BufferRange& readRange, const RD::BufferRange& sourceRangeNeededForShifting, float grainNumber, float detectedPeriod);
+	void _updateGrainWriteRange(RD::BufferRange& writeRange, const RD::BufferRange& outputRange, float grainNumber, float detectedPeriod, float periodAfterShifting);
 
 	/*-------- end of functions that are per-grain -----------*/
 
