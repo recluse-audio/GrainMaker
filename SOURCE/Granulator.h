@@ -134,8 +134,7 @@ private:
 	void _updateSourceRange(const juce::AudioBuffer<float>& lookaheadBuffer);
 	void _updateOutputRange(const juce::AudioBuffer<float>& outputBuffer);
 	void _updateNumGrainsToOutput(float detectedPeriod, float shiftRatio);
-	void _updateOutputRangeInSource();
-	void _updateSourceRangeNeededForShifting(float shiftRatio);
+
 	// take the fractional num grains needed for pitch shifting and add one to be sure we have enough data
 	void _getSourceRangeNeededForNumGrains(int numGrains, float detectedPeriod
 											, const RD::BufferRange& sourceRange
