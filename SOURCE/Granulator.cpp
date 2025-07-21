@@ -161,14 +161,11 @@ void Granulator::processShifting(juce::AudioBuffer<float>& lookaheadBuffer, juce
 	_updateSourceRange(lookaheadBuffer);
 	_updateOutputRange(outputBuffer);
 	_updateNumGrainsToOutput(detectedPeriod, shiftRatio);
-	// _updateOutputRangeInSource(); 
-	// _updateSourceRangeNeededForShifting(shiftRatio);
+
 
 	int numWholeGrains = (int) mCurrentGrainData.mNumGrainsToOutput + 1;
 	RD::BufferRange sourceRangeForGranulating;
 	_getSourceRangeNeededForNumGrains(numWholeGrains, detectedPeriod, mCurrentGrainData.mSourceRange, sourceRangeForGranulating);
-	// float numPartialGrains = (float)mCurrentGrainData.mNumGrainsToOutput - (float)numWholeGrains;
-
 
 	juce::int64 shiftOffset = _calculatePitchShiftOffset(detectedPeriod, shiftRatio);
 
@@ -302,10 +299,9 @@ void Granulator::_updateGrainWriteRange(RD::BufferRange& writeRange, const RD::B
 {
 	juce::int64 startOfOutputRange = 0; // is this ever not 0? This refers to first index of processBlock(outputRange)
 	juce::int64 offsetDueToGrainNumber = (juce::int64)(grainNumber * periodAfterShifting);
-	juce::int64 length = (juce::int64)detectedPeriod;
 
 	writeRange.setStartIndex(startOfOutputRange + offsetDueToGrainNumber);
-	writeRange.setLengthInSamples(length - 1); // -1 to make juce::Range behave the way I want for a buffer
+	writeRange.setLengthInSamples( (juce::int64)detectedPeriod );
 
 	if(writeRange.getEndIndex() >= outputRange.getEndIndex())
 		writeRange.setEndIndex(outputRange.getEndIndex());
@@ -368,63 +364,7 @@ void Granulator::_updateNumGrainsToOutput(float detectedPeriod, float shiftRatio
 //==============================================================================
 
 
-//==============================================================================
-void Granulator::_updateOutputRangeInSource()
-{
-	juce::int64 startInSource = mCurrentGrainData.mSourceRange.getLengthInSamples() - mCurrentGrainData.mOutputRange.getLengthInSamples();
-	juce::int64 endInSource = mCurrentGrainData.mOutputRange.getLengthInSamples() + startInSource;
-	mCurrentGrainData.mOutputRangeInSource.setStartIndex(startInSource);
-	mCurrentGrainData.mOutputRangeInSource.setEndIndex(endInSource);
-}
 
-//=============================================================================
-// void Granulator::_updateSourceRangeNeededForShifting(float shiftRatio)
-// {
-
-	
-// 	juce::int64 startInSource = mCurrentGrainData.mOutputRangeInSource.getStartIndex();
-// 	juce::int64 outputLength = mCurrentGrainData.mOutputRangeInSource.getLengthInSamples();
-// 	float floatStartInSource = (float)startInSource;
-// 	float floatOutputLength = (float)outputLength;
-
-// 	// If shifting up we will take excess source audio data and create extra grains out of it to produce the shift up effect
-// 	juce::int64 sourceLengthNeededForShifting = (juce::int64)(floatOutputLength * shiftRatio);
-
-// 	juce::int64 shiftOffset = sourceLengthNeededForShifting - outputLength;
-// 	juce::int64 shiftedStart = startInSource - shiftOffset;
-
-// 	mCurrentGrainData.mSourceRangeNeededForShifting.setStartIndex(shiftedStart);
-// 	mCurrentGrainData.mSourceRangeNeededForShifting.setLengthInSamples(sourceLengthNeededForShifting);
-	
-// }
-
-//=============================================================================
-void Granulator::_updateSourceRangeNeededForShifting(float shiftRatio)
-{
-	juce::int64 startInSourceBuffer = mCurrentGrainData.mOutputRangeInSource.getStartIndex();
-	juce::int64 endInSourceBuffer = mCurrentGrainData.mOutputRangeInSource.getEndIndex();
-
-	// only need more data if we are shifting up
-	if(shiftRatio > 1.f)
-	{
-		juce::int64 startInSource = mCurrentGrainData.mOutputRangeInSource.getStartIndex();
-		juce::int64 samplesNeeded = mCurrentGrainData.mOutputRangeInSource.getLengthInSamples() + 1; // + 1 to account for juce::Range::length vs juce::Buffer::numSamples discrepancy
-		float floatStartInSource = (float)startInSource;
-		float floatSamplesNeeded = (float)samplesNeeded;
-
-		// If shifting up we will take excess source audio data and create extra grains out of it to produce the shift up effect
-		juce::int64 sourceSamplesNeededForShifting = (juce::int64)(floatSamplesNeeded * shiftRatio);
-
-		juce::int64 shiftOffset = sourceSamplesNeededForShifting - samplesNeeded;
-		
-		startInSourceBuffer = startInSource - shiftOffset;
-		endInSourceBuffer = startInSourceBuffer + sourceSamplesNeededForShifting - 1; // -1 to get back in buffer sample index, not total sample numbers
-	}
-
-	mCurrentGrainData.mSourceRangeNeededForShifting.setStartIndex(startInSourceBuffer);
-	mCurrentGrainData.mSourceRangeNeededForShifting.setEndIndex(endInSourceBuffer);
-	
-}
 
 
 //==============================================================================
