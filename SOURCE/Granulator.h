@@ -59,10 +59,11 @@ private:
 
 	// partial grains extending beyond the bounds of the outputBuffer get written here, in the next block they are written at the start
 	juce::AudioBuffer<float> mSpilloverBuffer;
-
 	// spillover is larger than even the longest grain, so track how far the spillover grains actually go into the next outputBuffer.
 	// This is the end position of the last grain that spilled over from the previous processBlock
 	juce::int64 mSpilloverLength = 0; 
+	float mPreviousPeriod = 0.f;
+
 	/** 
 	 * @brief These Ranges get used ever processBlock so it made sense to make them member variables
 	 */
@@ -155,6 +156,7 @@ private:
 	// instead fade out quickly
 	void _applyWindowToPartialGrain(juce::dsp::AudioBlock<float>& block);
 
-	juce::int64 mOffsetFromSpillover = 0;  // in samples; carries over from block to block
-	float mPreviousPeriod = 0.f;
+	juce::int64 _calculateSpilloverOffsetAfterShifting(float previousPeriod, juce::int64 spilloverNumSamples, float shiftRatio);
+
+
 };

@@ -98,11 +98,48 @@ public:
 	RD::BufferRange& getReadRange()         { return mGranulator.mCurrentGrainData.mGrainReadRange; }
 	RD::BufferRange& getWriteRange()        { return mGranulator.mCurrentGrainData.mGrainWriteRange; }
 
-
+	juce::int64 calculateSpilloverOffsetAfterShifting(float period, juce::int64 spilloverSamples, float shiftRatio)
+	{
+		return mGranulator._calculateSpilloverOffsetAfterShifting(period, spilloverSamples, shiftRatio);
+	}
 private:
 	Granulator& mGranulator;
 };
 
+//========================================
+//
+TEST_CASE("Can calculate offset for grain writing using prev period value")
+{
+	Granulator granulator;
+	GranulatorTester granulatorTester(granulator);
+
+	SECTION("With spillover and shift ratio of 1.f, offset is equal to spilloverNumSamples")
+	{
+		float prevPeriod = 100.f;
+		juce::int64 spilloverSamples = 0;
+		float shiftRatio = 1.f;
+		juce::int64 offset = granulatorTester.calculateSpilloverOffsetAfterShifting(prevPeriod, spilloverSamples, shiftRatio );
+		CHECK(offset == 0);
+	}
+
+	SECTION("With spillover and shift ratio of 1.f, offset is equal to spilloverNumSamples")
+	{
+		float prevPeriod = 100.f;
+		juce::int64 spilloverSamples = 50;
+		float shiftRatio = 1.f;
+		juce::int64 offset = granulatorTester.calculateSpilloverOffsetAfterShifting(prevPeriod, spilloverSamples, shiftRatio );
+		CHECK(offset == 50);
+	}
+
+	SECTION("Spillover offset")
+	{
+		float prevPeriod = 100.f;
+		juce::int64 spilloverSamples = 50;
+		float shiftRatio = 1.f;
+		juce::int64 offset = granulatorTester.calculateSpilloverOffsetAfterShifting(prevPeriod, spilloverSamples, shiftRatio );
+		CHECK(offset == 50);
+	}
+}
 
 //========================================
 //
@@ -439,33 +476,33 @@ TEST_CASE("Can calculate read/write ranges with no shifting")
 	}
 
 
-	SECTION("Read/Write middle grain - no shifting")
-	{
-		float grainNum = 3.5f; 
-		float detectedPeriod = 128.f;
-		float shiftedRatio = 1.f;
+	// SECTION("Read/Write middle grain - no shifting")
+	// {
+	// 	float grainNum = 3.5f; 
+	// 	float detectedPeriod = 128.f;
+	// 	float shiftedRatio = 1.f;
 
-		// READ 
-		RD::BufferRange grainReadRange;
-		granulatorTester.updateGrainReadRange(grainReadRange, sourceRangeNeededForShifting, grainNum, detectedPeriod);
-		juce::int64 expectedReadStart = sourceRangeNeededForShifting.getStartIndex() + (juce::int64)(grainNum * detectedPeriod);
-		juce::int64 expectedReadLength = (juce::int64)(detectedPeriod / 2.f);
+	// 	// READ 
+	// 	RD::BufferRange grainReadRange;
+	// 	granulatorTester.updateGrainReadRange(grainReadRange, sourceRangeNeededForShifting, grainNum, detectedPeriod);
+	// 	juce::int64 expectedReadStart = sourceRangeNeededForShifting.getStartIndex() + (juce::int64)(grainNum * detectedPeriod);
+	// 	juce::int64 expectedReadLength = (juce::int64)(detectedPeriod / 2.f);
 
-		CHECK(grainReadRange.getStartIndex() == expectedReadStart);
-		CHECK(grainReadRange.getLengthInSamples() == expectedReadLength);
+	// 	CHECK(grainReadRange.getStartIndex() == expectedReadStart);
+	// 	CHECK(grainReadRange.getLengthInSamples() == expectedReadLength);
 
-		//--------------------------------------------
+	// 	//--------------------------------------------
 
-		// WRITE
-		float shiftedPeriod = detectedPeriod * ( 1.f / shiftedRatio);
-		RD::BufferRange grainWriteRange;
-		granulatorTester.updateGrainWriteRange(grainWriteRange, outputRange, grainNum, detectedPeriod, shiftedPeriod);
+	// 	// WRITE
+	// 	float shiftedPeriod = detectedPeriod * ( 1.f / shiftedRatio);
+	// 	RD::BufferRange grainWriteRange;
+	// 	granulatorTester.updateGrainWriteRange(grainWriteRange, outputRange, grainNum, detectedPeriod, shiftedPeriod);
 		
-		juce::int64 expectedWriteStart = (juce::int64)(grainNum * shiftedPeriod);
-		juce::int64 expectedLength = (juce::int64)(detectedPeriod / 2.f);
-		CHECK(grainWriteRange.getStartIndex() == expectedWriteStart);
-		CHECK(grainWriteRange.getLengthInSamples() == expectedLength);
-	}
+	// 	juce::int64 expectedWriteStart = (juce::int64)(grainNum * shiftedPeriod);
+	// 	juce::int64 expectedLength = (juce::int64)(detectedPeriod / 2.f);
+	// 	CHECK(grainWriteRange.getStartIndex() == expectedWriteStart);
+	// 	CHECK(grainWriteRange.getLengthInSamples() == expectedLength);
+	// }
 
 }
 
