@@ -20,6 +20,8 @@ PluginProcessor::PluginProcessor()
     mGranulator->setGrainLengthInSamples(1024);
     mGranulator->setGrainShape(Window::Shape::kHanning);
 
+	mShiftRatio = 1.f;
+	
     _initParameterListeners();
 
 }
