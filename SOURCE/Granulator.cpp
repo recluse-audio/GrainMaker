@@ -183,7 +183,7 @@ void Granulator::processShifting(juce::AudioBuffer<float>& lookaheadBuffer, juce
 
 		// this is the whole grain, part of it might get written to spillover
 		// juce::dsp::AudioBlock<float> grainReadBlock = BufferHelper::getRangeAsBlock(lookaheadBuffer, readRange);
-		juce::dsp::AudioBlock<float> grainReadBlock = lookaheadBlock.getSubBlock(readRange.getStartIndex(), readRange.getLengthInSamples() + 1);
+		juce::dsp::AudioBlock<float> grainReadBlock = lookaheadBlock.getSubBlock(readRange.getStartIndex(), readRange.getLengthInSamples());
 		_applyWindowToFullGrain(grainReadBlock);
 	
 
@@ -195,7 +195,7 @@ void Granulator::processShifting(juce::AudioBuffer<float>& lookaheadBuffer, juce
 		_getWriteRangeInOutputAndSpillover(writeRange, mCurrentGrainData.mOutputRange, grainRangeForOutput, grainRangeForSpillover, writeRangeInOutputBuffer, spilloverBufferWriteRange);
 
 		// get block/range for  outputBuffer (processBlock) and write to it here
-		juce::dsp::AudioBlock<float> outputBlock = grainReadBlock.getSubBlock(grainRangeForOutput.getStartIndex(), grainRangeForOutput.getLengthInSamples() + 1);
+		juce::dsp::AudioBlock<float> outputBlock = grainReadBlock.getSubBlock(grainRangeForOutput.getStartIndex(), grainRangeForOutput.getLengthInSamples());
 		BufferHelper::writeBlockToBuffer(outputBuffer, outputBlock, writeRangeInOutputBuffer);
 
 		// update this so we know how far to write next block
@@ -203,12 +203,13 @@ void Granulator::processShifting(juce::AudioBuffer<float>& lookaheadBuffer, juce
 		{
 
 			// writeRangeInOutputBuffer.length should correspond with the start of the section of the grain to "spillover", not end (that is relative to output buffer not grain itself)
-			juce::dsp::AudioBlock<float> spilloverBlock = grainReadBlock.getSubBlock(grainRangeForSpillover.getStartIndex(), grainRangeForSpillover.getLengthInSamples() + 1 );
+			juce::dsp::AudioBlock<float> spilloverBlock = grainReadBlock.getSubBlock(grainRangeForSpillover.getStartIndex(), grainRangeForSpillover.getLengthInSamples());
 			BufferHelper::writeBlockToBuffer(mSpilloverBuffer, spilloverBlock, spilloverBufferWriteRange);
 		}
 
 		
-
+		mSpilloverLength = spilloverBufferWriteRange.getLengthInSamples();
+		mPreviousPeriod = detectedPeriod;
 
 
 		// take block range for 
@@ -226,7 +227,7 @@ void Granulator::_getSourceRangeNeededForNumGrains(int numGrains, float detected
 											, RD::BufferRange& sourceRangeForShifting)
 {
 	juce::int64 numSourceSamplesNeeded = juce::int64(numGrains * (double)detectedPeriod);
-	juce::int64 startInSource = sourceRange.getEndIndex() - numSourceSamplesNeeded + 1;
+	juce::int64 startInSource = sourceRange.getEndIndex() - numSourceSamplesNeeded;
 	jassert(startInSource >= 0);
 
 	sourceRangeForShifting.setStartIndex(startInSource);
@@ -237,19 +238,22 @@ void Granulator::_getSourceRangeNeededForNumGrains(int numGrains, float detected
 
 
 //==============================================================================
-void Granulator::_getWriteRangeInOutputAndSpillover(const RD::BufferRange& wholeGrainRange,
+void Granulator::_getWriteRangeInOutputAndSpillover(const RD::BufferRange& wholeGrainWriteRange,
 											const RD::BufferRange& outputRange,
 											RD::BufferRange& grainRangeForOutputBuffer,
 											RD::BufferRange& grainRangeForSpilloverBuffer,
 											RD::BufferRange& writeRangeInOutputBuffer,
 											RD::BufferRange& spilloverBufferWriteRange )
 {
+	// wholeGrainWriteRange may extend past the end of the current process block and will then write to the spillover buffer
+
+
 	// by default the output buffer write range is the whole grain range, but some grains extend past the end of the output buffer
-	writeRangeInOutputBuffer.setStartIndex(wholeGrainRange.getStartIndex());
-	writeRangeInOutputBuffer.setEndIndex(wholeGrainRange.getEndIndex());
+	writeRangeInOutputBuffer.setStartIndex(wholeGrainWriteRange.getStartIndex());
+	writeRangeInOutputBuffer.setEndIndex(wholeGrainWriteRange.getEndIndex());
 
 	grainRangeForOutputBuffer.setStartIndex(0);
-	grainRangeForOutputBuffer.setLengthInSamples(wholeGrainRange.getLengthInSamples());
+	grainRangeForOutputBuffer.setLengthInSamples(wholeGrainWriteRange.getLengthInSamples());
 
 	// by default none
 	grainRangeForSpilloverBuffer.setIsEmpty(true);
@@ -258,9 +262,9 @@ void Granulator::_getWriteRangeInOutputAndSpillover(const RD::BufferRange& whole
 	spilloverBufferWriteRange.setIsEmpty(true);
 
 	// if it extends past end
-	if(wholeGrainRange.getEndIndex() > outputRange.getEndIndex())
+	if(wholeGrainWriteRange.getEndIndex() > outputRange.getEndIndex())
 	{
-		writeRangeInOutputBuffer.setStartIndex(wholeGrainRange.getStartIndex());
+		writeRangeInOutputBuffer.setStartIndex(wholeGrainWriteRange.getStartIndex());
 		writeRangeInOutputBuffer.setEndIndex(outputRange.getEndIndex());
 
 		// ramge of grain to read and then write to outputBuffer
@@ -268,14 +272,17 @@ void Granulator::_getWriteRangeInOutputAndSpillover(const RD::BufferRange& whole
 		grainRangeForOutputBuffer.setLengthInSamples(writeRangeInOutputBuffer.getLengthInSamples());
 
 
-		juce::int64 spilloverSamples = wholeGrainRange.getEndIndex() - outputRange.getEndIndex();
-		spilloverBufferWriteRange.setEndIndex(spilloverSamples - 1);
+		juce::int64 spilloverSamples = (wholeGrainWriteRange.getEndIndex() - outputRange.getEndIndex())- 1;
+		spilloverBufferWriteRange.setStartIndex(0); // always write to start of spill over
+		spilloverBufferWriteRange.setLengthInSamples(spilloverSamples);
+
+		//spilloverBufferWriteRange.setEndIndex(spilloverSamples - 1);
 
 		juce::int64 grainRangeForSpilloverStart = grainRangeForOutputBuffer.getEndIndex() + 1;
-		juce::int64 grainRangeForSpilloverEnd = grainRangeForSpilloverStart + spilloverSamples - 1;
+		//juce::int64 grainRangeForSpilloverEnd = grainRangeForSpilloverStart + spilloverSamples - 1;
 
-		grainRangeForSpilloverBuffer.setStartIndex(grainRangeForSpilloverStart);
-		grainRangeForSpilloverBuffer.setEndIndex(grainRangeForSpilloverEnd);
+		grainRangeForSpilloverBuffer.setStartIndex(grainRangeForSpilloverStart); // start one index after the end index of range for output buffer 
+		grainRangeForSpilloverBuffer.setLengthInSamples(spilloverSamples);
 	}
 }
 
@@ -297,14 +304,14 @@ void Granulator::_updateGrainReadRange(RD::BufferRange& readRange, const RD::Buf
 //==============================================================================
 void Granulator::_updateGrainWriteRange(RD::BufferRange& writeRange, const RD::BufferRange& outputRange, float grainNumber, float detectedPeriod, float periodAfterShifting)
 {
-	juce::int64 startOfOutputRange = 0; // is this ever not 0? This refers to first index of processBlock(outputRange)
+	juce::int64 startOfOutputRange = mOffsetFromSpillover; // is this ever not 0? This refers to first index of processBlock(outputRange)
 	juce::int64 offsetDueToGrainNumber = (juce::int64)(grainNumber * periodAfterShifting);
 
 	writeRange.setStartIndex(startOfOutputRange + offsetDueToGrainNumber);
 	writeRange.setLengthInSamples( (juce::int64)detectedPeriod );
 
-	if(writeRange.getEndIndex() >= outputRange.getEndIndex())
-		writeRange.setEndIndex(outputRange.getEndIndex());
+	// if(writeRange.getEndIndex() >= outputRange.getEndIndex())
+	// 	writeRange.setEndIndex(outputRange.getEndIndex());
 }
 
 

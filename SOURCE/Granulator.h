@@ -155,4 +155,6 @@ private:
 	// instead fade out quickly
 	void _applyWindowToPartialGrain(juce::dsp::AudioBlock<float>& block);
 
+	juce::int64 mOffsetFromSpillover = 0;  // in samples; carries over from block to block
+	float mPreviousPeriod = 0.f;
 };
