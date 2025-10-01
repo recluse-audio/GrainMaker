@@ -14,8 +14,11 @@ set(TESTS
     SUBMODULES/RD/TESTS/test_Windowing.cpp
     SUBMODULES/RD/TESTS/tests_Interpolator.cpp
     TESTS/TEST_UTILS/BufferGenerator.h
+    TESTS/TEST_UTILS/GrainShifterTester.h
+    TESTS/TEST_UTILS/TestDefaults.h
     TESTS/test_Grain.cpp
     TESTS/test_GrainCorrector.cpp
+    TESTS/test_GrainShifter.cpp
     TESTS/test_Granulator.cpp
     TESTS/test_PitchDetector.cpp
     TESTS/test_PitchMarkedCircularBuffer.cpp
