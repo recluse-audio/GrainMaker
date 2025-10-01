@@ -75,3 +75,17 @@ The fundamental issue is that `juce::Range::getLength()` and `juce::AudioBuffer:
 So I created a class in the `RD` repo called `BufferRange`. Not complicated at all, but ending confusion 4ever I hope.
 
 In process of making tests for that and then replacing it everywhere I use juce::Range.... eek
+
+
+### 2025-08-03 ###
+I think I have two issues and they aren't buffer discontinuity as I conceived it.
+
+I think at large block sizes the issue may be the buffer overlap issue --- maybe.
+
+With small block sizes, the issue might be that the grains span multiple blocks
+
+
+### 2025-09-19 ###
+Continuing with the concept of the grains with buffers inside them being an issue. 
+- not sure if this is what causes the thumping at long buffer sizes though
+
