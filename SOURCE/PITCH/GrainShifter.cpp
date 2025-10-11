@@ -3,7 +3,7 @@
 
 GrainShifter::GrainShifter()
 {
-    mWindow.setShape(Window::Shape::kNone);
+    mWindow.setShape(Window::Shape::kHanning);
 	mGrainProcessingBuffer.clear();
 
 }
@@ -12,20 +12,16 @@ GrainShifter::~GrainShifter()
 {
 }
 
-void GrainShifter::setGrainShape(Window::Shape newShape)
-{
-
-}
-
 void GrainShifter::prepare(double sampleRate, int blockSize)
 {
-	mWindow.setSizeShapePeriod(sampleRate, Window::Shape::kHanning, sampleRate);
-    mSampleRate = sampleRate;
+	mSampleRate = sampleRate;
 	mGrainProcessingBuffer.setSize(2, mSampleRate); // much bigger than we need
+	mWindow.setSize(sampleRate); 
+}
 
-
-
-
+void GrainShifter::setGrainShape(Window::Shape newShape)
+{
+	mWindow.setShape(newShape);
 }
 
 Window& GrainShifter::getGrainWindow()
@@ -36,7 +32,7 @@ Window& GrainShifter::getGrainWindow()
 void GrainShifter::processShifting(juce::AudioBuffer<float>& lookaheadBuffer, juce::AudioBuffer<float>& outputBuffer, float detectedPeriod, float shiftRatio)
 {
 	// write the spillover samples from previous processBlock to output (the final grain will almost always extend beyond end of prev buffer)
-	_writeGrainBufferSpilloverToOutput(mGrainProcessingBuffer, outputBuffer, mPreviousBlockData);
+	//_writeGrainBufferSpilloverToOutput(mGrainProcessingBuffer, outputBuffer, mPreviousBlockData);
 	mGrainProcessingBuffer.clear(); // clean now, write new data/spillover
 	
 	// Make ranges out of the buffer we are granulating and the buffer we are writing to

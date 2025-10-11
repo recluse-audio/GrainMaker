@@ -37,10 +37,9 @@ public:
 
 	// TODO: These should probably be private functions but for now I'm making them public for temp dev work.
 	// once solidifed I will use a script / AI to convert this to private and add to GrainShifterTester / test_GrainShifter.cpp
-	bool _write
 private:
 	friend class GrainShifterTester;
-    double mSampleRate = -1;
+    double mSampleRate = 44100;
     Window mWindow;
 
 	// partial grains extending beyond the bounds of the outputBuffer get written here, in the next block they are written at the start
