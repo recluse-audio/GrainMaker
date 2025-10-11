@@ -22,7 +22,6 @@ TEST_CASE("GrainShifter is prepared correctly when prepareToPlay() is called", "
 	grainShifter.prepare(sampleRate, blockSize);
 
 	CHECK(GrainShifterTester::getSampleRate(grainShifter) == sampleRate);
-	CHECK(grainShifter.getGrainWindow().getShape() == Window::Shape::kHanning);
 	CHECK(grainShifter.getGrainWindow().getSize() == sampleRate);
 }
 
@@ -33,10 +32,72 @@ TEST_CASE("GrainShifter allows you to set grain shape")
 	grainShifter.setGrainShape(Window::Shape::kNone);
 	CHECK(grainShifter.getGrainWindow().getShape() == Window::Shape::kNone);
 	grainShifter.setGrainShape(Window::Shape::kHanning);
-	CHECK(grainShifter.getGrainWindow().getShape() == Window::Shape::kNone);
-
-	
+	CHECK(grainShifter.getGrainWindow().getShape() == Window::Shape::kHanning);
 }
+
+
+
+
+
+//=============================
+TEST_CASE("Can convert phase in radians to samples.")
+{
+
+}
+
+//==============================
+TEST_CASE("Can granulate buffer")
+{
+
+	SECTION("No Shifting")
+	{
+
+	}
+
+	SECTION("Shifting Up")
+	{
+
+	}
+
+	SECTION("Shifting Down")
+	{
+
+	}
+}
+
+//================================
+TEST_CASE("Can determine when next lookahead is needed")
+{
+
+}
+
+//================================
+TEST_CASE("Active grain buffer index is iterated properly")
+{
+
+}
+
+//=================================
+TEST_CASE("Correct grain buffer is returned for given index")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 TEST_CASE("Can calculate correct start position given necessary data from previous block.", "test_GrainShifter")
