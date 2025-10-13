@@ -53,7 +53,7 @@ The project uses automated version management. Version is stored in `VERSION.txt
    - Returns period in samples for grain-based processing
    - Uses difference function and cumulative mean normalized difference
 
-2. **GrainShifter** (`SOURCE/PITCH/GrainShifter.h`): **PRIMARY DEVELOPMENT FOCUS** - Performs pitch shifting using granular synthesis
+2. **GrainShifter** (`SOURCE/GRAIN/GrainShifter.h`): **PRIMARY DEVELOPMENT FOCUS** - Performs pitch shifting using granular synthesis
    - Handles grain windowing and overlap-add synthesis
    - Manages spillover between audio blocks for continuous output
    - Uses lookahead buffer for proper grain extraction
@@ -67,6 +67,7 @@ The project uses automated version management. Version is stored in `VERSION.txt
 
 ### Supporting Components (Currently Active)
 
+- **GrainBuffer** (`SOURCE/GRAIN/GrainBuffer.h`): Buffer management for double-buffered grain storage
 - **PitchMarkedCircularBuffer**: Circular buffer with pitch period markers for grain extraction
 - **Window** (from RD submodule): Provides various window shapes for grain envelopes
 

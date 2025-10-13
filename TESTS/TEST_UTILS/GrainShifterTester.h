@@ -1,4 +1,4 @@
-#include "../../SOURCE/PITCH/GrainShifter.h"
+#include "../../SOURCE/GRAIN/GrainShifter.h"
 
 /** Friend class used to test private functions of GrainShifter */
 class GrainShifterTester

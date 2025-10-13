@@ -1,22 +1,10 @@
 set(SOURCES
-    SOURCE/Grain.cpp
-    SOURCE/Grain.h
-    SOURCE/Granulator.cpp
-    SOURCE/Granulator.h
-    SOURCE/PITCH/GrainBuffer.cpp
-    SOURCE/PITCH/GrainBuffer.h
-    SOURCE/PITCH/GrainCorrector.cpp
-    SOURCE/PITCH/GrainCorrector.h
-    SOURCE/PITCH/GrainShifter.cpp
-    SOURCE/PITCH/GrainShifter.h
-    SOURCE/PITCH/PitchCorrector.cpp
-    SOURCE/PITCH/PitchCorrector.h
+    SOURCE/GRAIN/GrainBuffer.cpp
+    SOURCE/GRAIN/GrainBuffer.h
+    SOURCE/GRAIN/GrainShifter.cpp
+    SOURCE/GRAIN/GrainShifter.h
     SOURCE/PITCH/PitchDetector.cpp
     SOURCE/PITCH/PitchDetector.h
-    SOURCE/PITCH/PitchDetector_backup.cpp
-    SOURCE/PITCH/PitchDetector_backup.h
-    SOURCE/PITCH/PitchMarkedCircularBuffer.cpp
-    SOURCE/PITCH/PitchMarkedCircularBuffer.h
     SOURCE/PluginEditor.cpp
     SOURCE/PluginEditor.h
     SOURCE/PluginProcessor.cpp

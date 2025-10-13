@@ -4,7 +4,7 @@
  */
 
 #include <catch2/catch_test_macros.hpp>
-#include "../SOURCE/PITCH/GrainBuffer.h"
+#include "../SOURCE/GRAIN/GrainBuffer.h"
 #include <catch2/catch_approx.hpp>  // For Approx in Catch2 v3+
 
 TEST_CASE("GrainBuffer Basic Functionality", "[test_GrainBuffer]")

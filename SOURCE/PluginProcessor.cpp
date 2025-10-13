@@ -1,7 +1,7 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 #include "PITCH/PitchDetector.h"
-#include "PITCH/GrainShifter.h"
+#include "GRAIN/GrainShifter.h"
 #include "../SUBMODULES/RD/SOURCE/CircularBuffer.h"
 
 //==============================================================================
