@@ -11,6 +11,7 @@
 
 #pragma once
 #include "Util/Juce_Header.h"
+#include "GrainBuffer.h"
 #include "../SUBMODULES/RD/SOURCE/Window.h"
 #include "../SUBMODULES/RD/SOURCE/BufferRange.h"
 
@@ -28,13 +29,14 @@ public:
     void setGrainShape(Window::Shape newShape);
 
 	//
-    void prepare(double sampleRate, int blockSize);
+    void prepare(double sampleRate, int lookaheadBufferNumSamples);
 
 	// won't die if buffers are stupidly sized, but will simply write 0's
 	void processShifting(juce::AudioBuffer<float>& lookaheadBuffer, juce::AudioBuffer<float>& outputBuffer, float detectedPeriod, float shiftRatio);
 
 	Window& getGrainWindow();
 
+	static void granulateBuffer(const juce::AudioBuffer<float>& bufferToGranulate, juce::AudioBuffer<float>& bufferToWriteTo, float detectedPeriod, float shiftedPeriod, double sampleRate, double phaseOffsetRadians);
 	// TODO: These should probably be private functions but for now I'm making them public for temp dev work.
 	// once solidifed I will use a script / AI to convert this to private and add to GrainShifterTester / test_GrainShifter.cpp
 private:
@@ -42,14 +44,31 @@ private:
     double mSampleRate = 44100;
     Window mWindow;
 
+	// Array of 2 GrainBuffers for double-buffering grain processing
+	GrainBuffer mGrainBuffers[2];
+
+	// This will be the read index for both grain buffers, when it is larger than the current grain buffers length in samples (after shifting), we know to switch to the other buffer
+	juce::int64 mGrainReadIndex = 0;
+
+	// Index of the currently active grain buffer (0 or 1)
+	int mActiveGrainBufferIndex = 0;
+
 	// partial grains extending beyond the bounds of the outputBuffer get written here, in the next block they are written at the start
 	juce::AudioBuffer<float> mGrainProcessingBuffer;
-
+	double mGrainPhaseIndexInRadians = 0.0;
+	bool mShouldGranulateLookaheadBuffer = true;
 	// spillover is larger than even the longest grain, so track how far the spillover grains actually go into the next outputBuffer.
 	// This is the end position of the last grain that spilled over from the previous processBlock
 	juce::int64 mSpilloverLength = 0; 
 
-	
+	juce::int64 _calculateGrainSamplesRemainingForGivenPhase(double phaseInRadians, float detectedPeriod);
+
+	// Reads the next grain sample from the current position for the given channel
+	float _readNextGrainSample(int channel);
+
+	// Increments the grain read index and switches buffers if needed
+	void _incrementGrainReadIndex();
+
 	// The start sample index of the first grain is not always [0]. If the final whole grain from the prev processBlock would
 	// extend past the end of the prev processBlock then it needs to "spillover" into the next buffer. 
 	// That means the audio data for those indices written to in the spillover at the start of process().

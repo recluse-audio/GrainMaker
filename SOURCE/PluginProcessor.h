@@ -2,16 +2,18 @@
 
 #include "Util/Juce_Header.h"
 
-class PitchDetector;
-class PitchMarkedCircularBuffer;
-class GrainCorrector;
 class CircularBuffer;
-class Granulator;
+class PitchDetector;
+class GrainShifter;
 
 #if (MSVC)
 #include "ipps.h"
 #endif
 
+namespace MagicNumbers
+{
+	constexpr int minLookaheadSize = 1024;
+} // end namespace MagicNumbers
 class PluginProcessor : public juce::AudioProcessor
                       , public juce::AudioProcessorValueTreeState::Listener
 {
@@ -53,13 +55,14 @@ public:
    // AudioProcessorValueTreeState::Listener callback
     void parameterChanged(const juce::String& parameterID, float newValue) override;
 
+	// For testing purposes - provides access to GrainShifter
+	GrainShifter* getGrainShifter() { return mGrainShifter.get(); }
+
 private:
 	float mShiftRatio = 1.f;
     std::unique_ptr<PitchDetector> mPitchDetector;
-    std::unique_ptr<PitchMarkedCircularBuffer> mPMCBuffer;
-    std::unique_ptr<GrainCorrector> mGrainCorrector;
+    std::unique_ptr<GrainShifter> mGrainShifter;
     std::unique_ptr<CircularBuffer> mCircularBuffer;
-    std::unique_ptr<Granulator> mGranulator;
 
 	juce::AudioBuffer<float> mLookaheadBuffer;
 

@@ -1,9 +1,8 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 #include "PITCH/PitchDetector.h"
-#include "PITCH/PitchMarkedCircularBuffer.h"
-#include "PITCH/GrainCorrector.h"
-#include "Granulator.h"
+#include "PITCH/GrainShifter.h"
+#include "../SUBMODULES/RD/SOURCE/CircularBuffer.h"
 
 //==============================================================================
 PluginProcessor::PluginProcessor()
@@ -11,14 +10,8 @@ PluginProcessor::PluginProcessor()
 , apvts(*this, nullptr, "Parameters", _createParameterLayout())
 {
     mPitchDetector = std::make_unique<PitchDetector>();
-    mPMCBuffer = std::make_unique<PitchMarkedCircularBuffer>();
-    mGrainCorrector = std::make_unique<GrainCorrector>(*mPMCBuffer.get());
     mCircularBuffer = std::make_unique<CircularBuffer>();
-    mGranulator = std::make_unique<Granulator>();
-
-    mGranulator->setEmissionPeriodInSamples(1024);
-    mGranulator->setGrainLengthInSamples(1024);
-    mGranulator->setGrainShape(Window::Shape::kHanning);
+	mGrainShifter = std::make_unique<GrainShifter>();
 
 	mShiftRatio = 1.f;
 	
@@ -30,11 +23,9 @@ PluginProcessor::PluginProcessor()
 //
 PluginProcessor::~PluginProcessor()
 {
+	mCircularBuffer.reset();
     mPitchDetector.reset();
-    mPMCBuffer.reset();
-    mGrainCorrector.reset();
-    mCircularBuffer.reset();
-    mGranulator.reset();
+    mGrainShifter.reset();
 }
 
 //==============================================================================
@@ -105,28 +96,24 @@ void PluginProcessor::changeProgramName (int index, const juce::String& newName)
 //==============================================================================
 void PluginProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
-	int lookahead = samplesPerBlock;
+	// be atleast minLookaheadSize, if at or above, use 2x block size
+	int lookaheadBufferNumSamples = samplesPerBlock >= MagicNumbers::minLookaheadSize ? (samplesPerBlock * 2) : MagicNumbers::minLookaheadSize;
+	// scale for sample rates, we deal with the same size for 44100 and 48000 for now (same for 88200 and 96000)
+	if(sampleRate > 48000.0 && sampleRate <= 96000.0)
+		lookaheadBufferNumSamples = lookaheadBufferNumSamples * 2;
+	else if(sampleRate > 96000.0)
+		lookaheadBufferNumSamples = lookaheadBufferNumSamples * 4;
 
 	mLookaheadBuffer.clear();
-	mLookaheadBuffer.setSize(this->getNumOutputChannels(), samplesPerBlock + lookahead);
+	mLookaheadBuffer.setSize(this->getNumOutputChannels(), lookaheadBufferNumSamples);
 
-    // mPitchDetector->prepareToPlay(sampleRate, samplesPerBlock + lookahead);
-    mPitchDetector->prepareToPlay(sampleRate, samplesPerBlock);
-	
-    // mPMCBuffer->prepare(sampleRate, samplesPerBlock);
-    // mPMCBuffer->setSize(this->getNumOutputChannels(), (int)sampleRate); // by default 1 second
+    mPitchDetector->prepareToPlay(sampleRate, lookaheadBufferNumSamples);
 
-    // mGrainCorrector->prepare(sampleRate, samplesPerBlock);
-    // mGrainCorrector->setOutputDelay(samplesPerBlock);
-
+	int lookaheadNumSamples = lookaheadBufferNumSamples - samplesPerBlock;
     mCircularBuffer->setSize(this->getNumOutputChannels(), (int)sampleRate * 2); // by default 1 second
-    mCircularBuffer->setDelay(lookahead);
+    mCircularBuffer->setDelay(lookaheadNumSamples);
 
-    mGranulator->prepare(sampleRate, samplesPerBlock);
-
-    // mGranulator->setEmissionPeriodInSamples(44100);
-    // mGranulator->setGrainLengthInSamples(44100);
-    // mGranulator->setGrainShape(Window::Shape::kHanning);
+	mGrainShifter->prepare(sampleRate, lookaheadBufferNumSamples);
 
 }
 
@@ -175,24 +162,9 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 	mLookaheadBuffer.clear();
     mCircularBuffer->popBufferWithLookahead(mLookaheadBuffer, buffer);
 
-	// int sampleOffset = mLookaheadBuffer.getNumSamples() - buffer.getNumSamples();
-
-	// for(int sampleIndex = 0; sampleIndex < buffer.getNumSamples(); sampleIndex++)
-	// {
-	// 	for(int ch = 0; ch < buffer.getNumChannels(); ch++)
-	// 	{
-	// 		float lookaheadSample = mLookaheadBuffer.getSample(ch, sampleIndex);
-	// 		buffer.setSample(ch, sampleIndex, lookaheadSample);
-	// 	}
-	// }
 
     float detected_period = mPitchDetector->process(mLookaheadBuffer);
-	// mGranulator->setEmissionPeriodInSamples(detected_period * mShiftRatio);
-	mGranulator->processShifting(mLookaheadBuffer, buffer, detected_period, mShiftRatio);
 
-    // mPMCBuffer->pushBufferAndPeriod(buffer, detected_period);
-    // mGrainCorrector->process(buffer);
-    // buffer.applyGain(0.f);
 }
 
 //==============================================================================
@@ -253,11 +225,9 @@ void PluginProcessor::parameterChanged(const juce::String& parameterID, float ne
     if(parameterID == "shift ratio")
     {
 		mShiftRatio = newValue;
-        //mGrainCorrector->setTransposeRatio(newValue);
     }
     else if(parameterID == "emission rate")
     {
-        //mGranulator->setEmissionRateInHz(newValue);
     }
 }
 
