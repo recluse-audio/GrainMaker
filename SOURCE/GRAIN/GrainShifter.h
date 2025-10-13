@@ -36,7 +36,6 @@ public:
 
 	Window& getGrainWindow();
 
-	static void granulateBuffer(const juce::AudioBuffer<float>& bufferToGranulate, juce::AudioBuffer<float>& bufferToWriteTo, float detectedPeriod, float shiftedPeriod, double sampleRate, double phaseOffsetRadians);
 	// TODO: These should probably be private functions but for now I'm making them public for temp dev work.
 	// once solidifed I will use a script / AI to convert this to private and add to GrainShifterTester / test_GrainShifter.cpp
 private:
