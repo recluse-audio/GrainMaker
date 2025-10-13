@@ -120,21 +120,21 @@ float GrainShifter::_readNextGrainSample(int channel)
 //========================
 void GrainShifter::_incrementGrainReadIndex()
 {
-	// // Get the currently active grain buffer's length
-	// juce::int64 bufferLength = mGrainBuffers[mActiveGrainBufferIndex].getLengthInSamples();
+	// Get the currently active grain buffer's length
+	juce::int64 bufferLength = mGrainBuffers[mActiveGrainBufferIndex].getLengthInSamples();
 
-	// // Increment the read index
-	// mGrainReadIndex++;
+	// Increment the read index
+	mGrainReadIndex++;
 
-	// // Check if we need to wrap around and switch buffers
-	// if (mGrainReadIndex >= bufferLength)
-	// {
-	// 	// Reset index to 0
-	// 	mGrainReadIndex = 0;
+	// Check if we need to wrap around and switch buffers
+	if (mGrainReadIndex >= bufferLength)
+	{
+		// Reset index to 0
+		mGrainReadIndex = 0;
 
-	// 	// Switch to the other buffer
-	// 	mActiveGrainBufferIndex = (mActiveGrainBufferIndex == 0) ? 1 : 0;
-	// }
+		// Switch to the other buffer
+		mActiveGrainBufferIndex = (mActiveGrainBufferIndex == 0) ? 1 : 0;
+	}
 }
 
 //========================
