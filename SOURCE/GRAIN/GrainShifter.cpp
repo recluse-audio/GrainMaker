@@ -61,15 +61,7 @@ void GrainShifter::processShifting(juce::AudioBuffer<float>& lookaheadBuffer, ju
 	}
 }
 
-//=============================
-void GrainShifter::granulateBuffer(const juce::AudioBuffer<float>& bufferToGranulate, juce::AudioBuffer<float>& bufferToWriteTo, float detectedPeriod, float shiftedPeriod, double sampleRate, double phaseOffsetRadians)
-{
-	// Function implementation to be completed
 
-
-
-
-}
 
 
 //=======================================================
