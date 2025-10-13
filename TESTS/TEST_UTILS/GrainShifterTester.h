@@ -46,4 +46,38 @@ public:
 		return g.mSampleRate;
 	}
 
+	static const GrainBuffer& getGrainBuffer(GrainShifter& g, int index)
+	{
+		jassert(index >= 0 && index < 2);
+		return g.mGrainBuffers[index];
+	}
+
+	static int getGrainBufferNumSamples(GrainShifter& g, int index)
+	{
+		jassert(index >= 0 && index < 2);
+		return g.mGrainBuffers[index].getBufferReference().getNumSamples();
+	}
+
+	static int getGrainBufferNumChannels(GrainShifter& g, int index)
+	{
+		jassert(index >= 0 && index < 2);
+		return g.mGrainBuffers[index].getBufferReference().getNumChannels();
+	}
+
+	static juce::int64 getGrainBufferLengthInSamples(GrainShifter& g, int index)
+	{
+		jassert(index >= 0 && index < 2);
+		return g.mGrainBuffers[index].getLengthInSamples();
+	}
+
+	static juce::int64 getGrainReadIndex(GrainShifter& g)
+	{
+		return g.mGrainReadIndex;
+	}
+
+	static int getActiveGrainBufferIndex(GrainShifter& g)
+	{
+		return g.mActiveGrainBufferIndex;
+	}
+
 };

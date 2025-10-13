@@ -89,3 +89,33 @@ With small block sizes, the issue might be that the grains span multiple blocks
 Continuing with the concept of the grains with buffers inside them being an issue. 
 - not sure if this is what causes the thumping at long buffer sizes though
 
+### 2025-10-12
+Introduced CLAUDE Code after deliberation.
+Pro: Increased Dev Speed
+Con: Expose my IP, weaken my dev skills?
+
+- Decision: Use CLAUDE Code
+- Why? 
+	1. It is free from work currently
+	2. My IP is not that safe on this computer currently, and will likely end up on github as well as resume thing (actually i think this seals it I do want to put this on github not just the droplet)
+
+
+
+#### Claude Code Instructions: ####
+.) Create a Definition for the class GrainBuffer. It should own a juce::AudioBuffer<float> called mBuffer, and a juce::int64 called mLengthInSamples. Provide functions and definitions called setLengthInSamples(juce::int64) and getLengthInSamples().
+
+.) Create a function called getBufferReference() which returns a reference to mBuffer
+
+TEST .)Create catch2 tests for the GrainBuffer in test_GrainBuffer.cpp. Keep them simple, making sure setters works, as well as getBufferREference()
+
+.) In the GrainShifter class, add an array of 2 GrainBuffer called mGrainBuffers. They should both be initialized to be 2 channels and in prepare() then should get set to lookaheadBufferNumSamples in length.
+
+.) In the GrainShifter class, add an int called mActiveGrainIndex and init to 0. 
+
+.) In the GrainShifter class: Add private member juce::int64 mGrainReadIndex with comment "This will be the read index for both grain buffers, when it is larger than the current grain buffers length in samples (after shifting), we know to switch to the other buffer
+
+TEST .) In the test_GrainShifter.cpp: Add a catch2 test that checks that mGrainReadIndex is incremented for each sample in the outputBuffer argument of processShifting
+
+TEST .) In test_GrainShifter.cpp: Add a catch2 test that checks that the if mGrainReadIndex is equal to or larger than the size of the current active grain buffer getLengthInSamples(), it wraps around the grain buffer's length in samples and swithces mActiveGrainIndex between 0 and 1.
+
+.) In the GrainShifter class:

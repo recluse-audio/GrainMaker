@@ -3,20 +3,32 @@
 
 GrainShifter::GrainShifter()
 {
-    mWindow.setShape(Window::Shape::kHanning);
+	mWindow.setShape(Window::Shape::kHanning);
 	mGrainProcessingBuffer.clear();
 
+	// Initialize both GrainBuffers to 2 channels
+	for (int i = 0; i < 2; ++i)
+	{
+		mGrainBuffers[i].getBufferReference().setSize(2, 0);
+	}
 }
 
 GrainShifter::~GrainShifter()
 {
 }
 
-void GrainShifter::prepare(double sampleRate, int blockSize)
+void GrainShifter::prepare(double sampleRate, int lookaheadBufferNumSamples)
 {
 	mSampleRate = sampleRate;
-	mGrainProcessingBuffer.setSize(2, mSampleRate); // much bigger than we need
-	mWindow.setSize(sampleRate); 
+	mGrainProcessingBuffer.setSize(2, lookaheadBufferNumSamples);
+	mWindow.setSize(lookaheadBufferNumSamples);
+
+	// Set both GrainBuffers to 2 channels and lookaheadBufferNumSamples length
+	for (int i = 0; i < 2; ++i)
+	{
+		mGrainBuffers[i].getBufferReference().setSize(2, lookaheadBufferNumSamples);
+		mGrainBuffers[i].setLengthInSamples(lookaheadBufferNumSamples);
+	}
 }
 
 void GrainShifter::setGrainShape(Window::Shape newShape)
@@ -31,53 +43,101 @@ Window& GrainShifter::getGrainWindow()
 
 void GrainShifter::processShifting(juce::AudioBuffer<float>& lookaheadBuffer, juce::AudioBuffer<float>& outputBuffer, float detectedPeriod, float shiftRatio)
 {
-	// write the spillover samples from previous processBlock to output (the final grain will almost always extend beyond end of prev buffer)
-	//_writeGrainBufferSpilloverToOutput(mGrainProcessingBuffer, outputBuffer, mPreviousBlockData);
-	mGrainProcessingBuffer.clear(); // clean now, write new data/spillover
-	
-	// Make ranges out of the buffer we are granulating and the buffer we are writing to
-	RD::BufferRange sourceRange; RD::BufferRange outputRange;
-	sourceRange.setRangeAccordingToBuffer(lookaheadBuffer);
-	outputRange.setRangeAccordingToBuffer(outputBuffer);
+	int numSamples = outputBuffer.getNumSamples();
+	int numChannels = outputBuffer.getNumChannels();
 
-	// This will determine the whole number of grains needed.
-	// Using whole number grains so the final grain always "spills over" into the next block.
-	// This is affected by spillover length
-	int numGrains = _calculateNumGrainsToOutput(detectedPeriod, shiftRatio, outputRange, mSpilloverLength);
-	juce::int64 periodAfterShifting = _calculatePeriodAfterShifting(detectedPeriod, shiftRatio);
-
-	RD::BufferRange sourceRangeNeeded;
-	_updateSourceRangeNeededForNumGrains(numGrains, detectedPeriod, sourceRange, sourceRangeNeeded);
-
-	juce::dsp::AudioBlock<float> lookaheadBlock(lookaheadBuffer);
-
-	for(int grainIndex = 0; grainIndex < numGrains; grainIndex++)
+	// Process each sample in the output buffer
+	for (int sampleIdx = 0; sampleIdx < numSamples; ++sampleIdx)
 	{
-		RD::BufferRange grainReadRangeInSource;
-		_updateGrainReadRange(grainReadRangeInSource, sourceRangeNeeded, grainIndex, detectedPeriod);
+		// Read the current sample for all channels
+		for (int channel = 0; channel < numChannels; ++channel)
+		{
+			float sample = _readNextGrainSample(channel);
+			outputBuffer.setSample(channel, sampleIdx, sample);
+		}
 
-		// this is the whole grain, part of it might get written to spillover
-		// juce::dsp::AudioBlock<float> grainReadBlock = BufferHelper::getRangeAsBlock(lookaheadBuffer, readRange);
-		juce::dsp::AudioBlock<float> grainReadBlock = lookaheadBlock.getSubBlock(grainReadRangeInSource.getStartIndex(), grainReadRangeInSource.getLengthInSamples());
-		_applyWindowToFullGrain(grainReadBlock);
-
-		// range in mGrainProcessingBuffer which accounts for the final grain which will extend beyond final index of output buffer
-		RD::BufferRange grainWriteRangeInFullGrainBuffer; 
-		_updateGrainWriteRange(grainWriteRangeInFullGrainBuffer, outputRange, grainIndex, detectedPeriod, periodAfterShifting);
-
-		BufferHelper::writeBlockToBuffer(mGrainProcessingBuffer, grainReadBlock, grainWriteRangeInFullGrainBuffer);
-
+		// Increment the read index once per sample (not per channel)
+		_incrementGrainReadIndex();
 	}
-
-	_writeGrainBufferToOutput(mGrainProcessingBuffer, outputBuffer, mPreviousBlockData);
-
-	
 }
+
+//=============================
+void GrainShifter::granulateBuffer(const juce::AudioBuffer<float>& bufferToGranulate, juce::AudioBuffer<float>& bufferToWriteTo, float detectedPeriod, float shiftedPeriod, double sampleRate, double phaseOffsetRadians)
+{
+	// Function implementation to be completed
+
+
+
+
+}
+
 
 //=======================================================
 //================ PRIVATE ==============================
 //=======================================================
 
+//===============
+juce::int64 GrainShifter::_calculateGrainSamplesRemainingForGivenPhase(double phaseInRadians, float detectedPeriod)
+{
+	// Normalize phase to [0, 2π) range
+	double normalizedPhase = std::fmod(phaseInRadians, juce::MathConstants<double>::twoPi);
+	if (normalizedPhase < 0.0)
+		normalizedPhase += juce::MathConstants<double>::twoPi;
+
+	// Calculate fraction of period completed (0.0 = start, 1.0 = end)
+	double fractionCompleted = normalizedPhase / juce::MathConstants<double>::twoPi;
+
+	// Calculate samples remaining from current phase position to end of period
+	double samplesRemaining = detectedPeriod * (1.0 - fractionCompleted);
+
+	// Round to nearest integer and return
+	juce::int64 grainSamplesRemaining = static_cast<juce::int64>(std::round(samplesRemaining));
+
+	return grainSamplesRemaining;
+}
+
+//========================
+float GrainShifter::_readNextGrainSample(int channel)
+{
+	// Get the currently active grain buffer
+	GrainBuffer& activeBuffer = mGrainBuffers[mActiveGrainBufferIndex];
+	juce::int64 bufferLength = activeBuffer.getLengthInSamples();
+
+	// Read the sample from the active buffer at the current index
+	float sample = 0.0f;
+	if (bufferLength > 0 && mGrainReadIndex < bufferLength)
+	{
+		sample = activeBuffer.getBufferReference().getSample(channel, static_cast<int>(mGrainReadIndex));
+	}
+
+	// Note: The index increment and wrapping should be done once per sample,
+	// not per channel. This should be handled by the calling function after
+	// all channels have been read for the current sample position.
+
+	return sample;
+}
+
+//========================
+void GrainShifter::_incrementGrainReadIndex()
+{
+	// // Get the currently active grain buffer's length
+	// juce::int64 bufferLength = mGrainBuffers[mActiveGrainBufferIndex].getLengthInSamples();
+
+	// // Increment the read index
+	// mGrainReadIndex++;
+
+	// // Check if we need to wrap around and switch buffers
+	// if (mGrainReadIndex >= bufferLength)
+	// {
+	// 	// Reset index to 0
+	// 	mGrainReadIndex = 0;
+
+	// 	// Switch to the other buffer
+	// 	mActiveGrainBufferIndex = (mActiveGrainBufferIndex == 0) ? 1 : 0;
+	// }
+}
+
+//========================
 juce::int64 GrainShifter::_calculateFirstGrainStartingPos(juce::int64 prevShiftedPeriod, const RD::BufferRange& prevOutputRange, const RD::BufferRange& prevGrainWriteRange )
 {
 

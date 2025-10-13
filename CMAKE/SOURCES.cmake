@@ -3,6 +3,8 @@ set(SOURCES
     SOURCE/Grain.h
     SOURCE/Granulator.cpp
     SOURCE/Granulator.h
+    SOURCE/PITCH/GrainBuffer.cpp
+    SOURCE/PITCH/GrainBuffer.h
     SOURCE/PITCH/GrainCorrector.cpp
     SOURCE/PITCH/GrainCorrector.h
     SOURCE/PITCH/GrainShifter.cpp
