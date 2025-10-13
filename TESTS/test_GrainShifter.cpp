@@ -3,7 +3,7 @@
 #include <catch2/catch_approx.hpp>  // For Approx in Catch2 v3+
 
 
-#include "../SOURCE/PITCH/GrainShifter.h"
+#include "../SOURCE/GRAIN/GrainShifter.h"
 #include "../SOURCE/PluginProcessor.h"
 
 #include "../SUBMODULES/RD/SOURCE/BufferFiller.h"

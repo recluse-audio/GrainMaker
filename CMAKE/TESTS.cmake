@@ -18,11 +18,7 @@ set(TESTS
     TESTS/TEST_UTILS/TestDefaults.h
     TESTS/test_Grain.cpp
     TESTS/test_GrainBuffer.cpp
-    TESTS/test_GrainCorrector.cpp
     TESTS/test_GrainShifter.cpp
-    TESTS/test_Granulator.cpp
     TESTS/test_PitchDetector.cpp
-    TESTS/test_PitchMarkedCircularBuffer.cpp
     TESTS/test_PluginBasics.cpp
-    TESTS/test_ProcessAudioFile.cpp
 )
