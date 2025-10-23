@@ -13,10 +13,12 @@
 #include "../SUBMODULES/RD/SOURCE/BufferRange.h"
 
 #include "TEST_UTILS/GrainShifterTester.h"
+#include "../SUBMODULES/RD/TESTS/TEST_UTILS/TestUtils.h"
 
 
 TEST_CASE("GrainShifter is prepared correctly when prepareToPlay() is called", "test_GrainShifter")
 {
+	TestUtils::SetupAndTeardown setupAndTeardown;
 	GrainShifter grainShifter;
 	double sampleRate = 48000;
 	int lookaheadBufferSize = 1024;
@@ -29,6 +31,7 @@ TEST_CASE("GrainShifter is prepared correctly when prepareToPlay() is called", "
 
 TEST_CASE("GrainShifter allows you to set grain shape")
 {
+	TestUtils::SetupAndTeardown setupAndTeardown;
 	GrainShifter grainShifter;
 	grainShifter.setGrainShape(Window::Shape::kNone);
 	CHECK(grainShifter.getGrainWindow().getShape() == Window::Shape::kNone);
@@ -38,6 +41,7 @@ TEST_CASE("GrainShifter allows you to set grain shape")
 
 TEST_CASE("PluginProcessor prepareToPlay configures lookahead buffer correctly", "[test_GrainShifter]")
 {
+	TestUtils::SetupAndTeardown setupAndTeardown;
 	PluginProcessor processor;
 
 	// Helper lambda to calculate expected lookahead buffer size based on the rules
@@ -280,6 +284,7 @@ TEST_CASE("Can granulate buffer")
 //================================
 TEST_CASE("mGrainReadIndex increments with each process call", "[test_GrainShifter]")
 {
+	TestUtils::SetupAndTeardown setupAndTeardown;
 	GrainShifter grainShifter;
 	grainShifter.prepare(44100, 1024);
 
@@ -308,6 +313,7 @@ TEST_CASE("mGrainReadIndex increments with each process call", "[test_GrainShift
 //================================
 TEST_CASE("mGrainReadIndex wraps around and switches active buffer", "[test_GrainShifter]")
 {
+	TestUtils::SetupAndTeardown setupAndTeardown;
 	GrainShifter grainShifter;
 
 	// Prepare with a small lookahead size for easier testing
@@ -443,6 +449,7 @@ TEST_CASE("Correct grain buffer is returned for given index")
 
 TEST_CASE("Can calculate correct start position given necessary data from previous block.", "test_GrainShifter")
 {
+	TestUtils::SetupAndTeardown setupAndTeardown;
 	GrainShifter grainShifter;
 
 	SECTION("Final grain ends on exactly first sample of next output buffer after shifting - startPos = 0 ")
@@ -494,6 +501,7 @@ TEST_CASE("Can calculate correct start position given necessary data from previo
 
 TEST_CASE("Can determine number of grains needed to accomplish given shifting effect", "test_GrainShifter")
 {
+	TestUtils::SetupAndTeardown setupAndTeardown;
 	GrainShifter grainShifter;
 	SECTION("No shifting")
 	{
@@ -523,6 +531,7 @@ TEST_CASE("Can determine number of grains needed to accomplish given shifting ef
 
 TEST_CASE("Can update source range needed for shifting", "test_GrainShifter")
 {
+	TestUtils::SetupAndTeardown setupAndTeardown;
 	GrainShifter grainShifter;
 	
 	SECTION("takes from fullSourceRange in a fifo manner, ending on the last/oldest sample in the fullSourceRange")

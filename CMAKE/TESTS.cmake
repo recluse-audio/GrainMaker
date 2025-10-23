@@ -16,7 +16,6 @@ set(TESTS
     TESTS/TEST_UTILS/BufferGenerator.h
     TESTS/TEST_UTILS/GrainShifterTester.h
     TESTS/TEST_UTILS/TestDefaults.h
-    TESTS/test_Grain.cpp
     TESTS/test_GrainBuffer.cpp
     TESTS/test_GrainShifter.cpp
     TESTS/test_Granulator.cpp

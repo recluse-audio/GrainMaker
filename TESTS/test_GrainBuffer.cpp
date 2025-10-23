@@ -6,9 +6,11 @@
 #include <catch2/catch_test_macros.hpp>
 #include "../SOURCE/GRAIN/GrainBuffer.h"
 #include <catch2/catch_approx.hpp>  // For Approx in Catch2 v3+
+#include "../SUBMODULES/RD/TESTS/TEST_UTILS/TestUtils.h"
 
 TEST_CASE("GrainBuffer Basic Functionality", "[test_GrainBuffer]")
 {
+	TestUtils::SetupAndTeardown setupAndTeardown;
 	GrainBuffer grainBuffer;
 
 	SECTION("Initial state")
