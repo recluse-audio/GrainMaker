@@ -102,7 +102,10 @@ Con: Expose my IP, weaken my dev skills?
 
 
 #### Claude Code Instructions: ####
+
+
 .) Create a Definition for the class GrainBuffer. It should own a juce::AudioBuffer<float> called mBuffer, and a juce::int64 called mLengthInSamples. Provide functions and definitions called setLengthInSamples(juce::int64) and getLengthInSamples().
+
 
 .) Create a function called getBufferReference() which returns a reference to mBuffer
 
@@ -110,12 +113,34 @@ TEST .)Create catch2 tests for the GrainBuffer in test_GrainBuffer.cpp. Keep the
 
 .) In the GrainShifter class, add an array of 2 GrainBuffer called mGrainBuffers. They should both be initialized to be 2 channels and in prepare() then should get set to lookaheadBufferNumSamples in length.
 
+.) Create a test in test_GrainShifter that instantiates a PluginProcessor and calls prepare to play with varied configurations.
+- rules
+- lookaheadBufferNumSamples is 1024 for block sizes of 512 and less
+- if block size is greater than 512, lookaheadBufferNumSamples is double the block size
+- lookaheadBufferNumSamples is same at 44100 and 48000, 88200 and 96000, and 176000 and 192000, doublng at each of these pairs the lookaheadBufferNumSamples
+
+
+---
+
 .) In the GrainShifter class, add an int called mActiveGrainIndex and init to 0. 
+
+---
 
 .) In the GrainShifter class: Add private member juce::int64 mGrainReadIndex with comment "This will be the read index for both grain buffers, when it is larger than the current grain buffers length in samples (after shifting), we know to switch to the other buffer
 
+---
+
 TEST .) In the test_GrainShifter.cpp: Add a catch2 test that checks that mGrainReadIndex is incremented for each sample in the outputBuffer argument of processShifting
+
+---
 
 TEST .) In test_GrainShifter.cpp: Add a catch2 test that checks that the if mGrainReadIndex is equal to or larger than the size of the current active grain buffer getLengthInSamples(), it wraps around the grain buffer's length in samples and swithces mActiveGrainIndex between 0 and 1.
 
+### 2025-10-13 ###
+#### Claude Instructions Cont. ####
 .) In the GrainShifter class:
+
+
+
+### 2025-10-21 ###
+Realized that I will likely need to repeat grains. New approach is to duplicate previous grain if new write position happens before the end of the current grain readPos. This will happen when shifting up, but not necessarily every readRange will have multiple emission points every time.
