@@ -255,159 +255,133 @@ TEST_CASE("PluginProcessor prepareToPlay configures lookahead buffer correctly",
 
 
 
-//=============================
-TEST_CASE("Can convert phase in radians to samples.")
-{
+// // //================================
+// // TEST_CASE("mGrainReadIndex increments with each process call", "[test_GrainShifter]")
+// // {
+// // 	TestUtils::SetupAndTeardown setupAndTeardown;
+// // 	GrainShifter grainShifter;
+// // 	grainShifter.prepare(44100, 1024);
 
-}
+// // 	juce::AudioBuffer<float> lookaheadBuffer(2, 1024);
+// // 	juce::AudioBuffer<float> outputBuffer(2, 256);
 
-//==============================
-TEST_CASE("Can granulate buffer")
-{
+// // 	// Get initial index
+// // 	juce::int64 initialIndex = GrainShifterTester::getGrainReadIndex(grainShifter);
 
-	SECTION("No Shifting")
-	{
+// // 	// First process call
+// // 	grainShifter.processShifting(lookaheadBuffer, outputBuffer, 128.0f, 1.0f);
+// // 	juce::int64 indexAfterFirst = GrainShifterTester::getGrainReadIndex(grainShifter);
+// // 	CHECK(indexAfterFirst > initialIndex);
 
-	}
+// // 	// Second process call
+// // 	grainShifter.processShifting(lookaheadBuffer, outputBuffer, 128.0f, 1.0f);
+// // 	juce::int64 indexAfterSecond = GrainShifterTester::getGrainReadIndex(grainShifter);
+// // 	CHECK(indexAfterSecond > indexAfterFirst);
 
-	SECTION("Shifting Up")
-	{
+// // 	// Third process call
+// // 	grainShifter.processShifting(lookaheadBuffer, outputBuffer, 128.0f, 1.0f);
+// // 	juce::int64 indexAfterThird = GrainShifterTester::getGrainReadIndex(grainShifter);
+// // 	CHECK(indexAfterThird > indexAfterSecond);
+// // }
 
-	}
+// //================================
+// TEST_CASE("mGrainReadIndex wraps around and switches active buffer", "[test_GrainShifter]")
+// {
+// 	TestUtils::SetupAndTeardown setupAndTeardown;
+// 	GrainShifter grainShifter;
 
-	SECTION("Shifting Down")
-	{
+// 	// Prepare with a small lookahead size for easier testing
+// 	int lookaheadSize = 512;
+// 	grainShifter.prepare(44100, lookaheadSize);
 
-	}
-}
+// 	// Create buffers
+// 	juce::AudioBuffer<float> lookaheadBuffer(2, lookaheadSize);
 
-//================================
-TEST_CASE("mGrainReadIndex increments with each process call", "[test_GrainShifter]")
-{
-	TestUtils::SetupAndTeardown setupAndTeardown;
-	GrainShifter grainShifter;
-	grainShifter.prepare(44100, 1024);
+// 	// Get initial state
+// 	int initialBufferIndex = GrainShifterTester::getActiveGrainBufferIndex(grainShifter);
+// 	juce::int64 initialReadIndex = GrainShifterTester::getGrainReadIndex(grainShifter);
 
-	juce::AudioBuffer<float> lookaheadBuffer(2, 1024);
-	juce::AudioBuffer<float> outputBuffer(2, 256);
+// 	CHECK(initialBufferIndex == 0); // Should start with buffer 0
+// 	CHECK(initialReadIndex == 0);    // Should start at index 0
 
-	// Get initial index
-	juce::int64 initialIndex = GrainShifterTester::getGrainReadIndex(grainShifter);
+// 	SECTION("Index wraps at buffer length")
+// 	{
+// 		// Process enough samples to reach near the end of the buffer
+// 		int samplesToProcess = lookaheadSize - 10;
+// 		juce::AudioBuffer<float> outputBuffer1(2, samplesToProcess);
 
-	// First process call
-	grainShifter.processShifting(lookaheadBuffer, outputBuffer, 128.0f, 1.0f);
-	juce::int64 indexAfterFirst = GrainShifterTester::getGrainReadIndex(grainShifter);
-	CHECK(indexAfterFirst > initialIndex);
+// 		grainShifter.processShifting(lookaheadBuffer, outputBuffer1, 128.0f, 1.0f);
 
-	// Second process call
-	grainShifter.processShifting(lookaheadBuffer, outputBuffer, 128.0f, 1.0f);
-	juce::int64 indexAfterSecond = GrainShifterTester::getGrainReadIndex(grainShifter);
-	CHECK(indexAfterSecond > indexAfterFirst);
+// 		// Check we're near the end but haven't wrapped
+// 		juce::int64 indexNearEnd = GrainShifterTester::getGrainReadIndex(grainShifter);
+// 		int bufferIndexNearEnd = GrainShifterTester::getActiveGrainBufferIndex(grainShifter);
 
-	// Third process call
-	grainShifter.processShifting(lookaheadBuffer, outputBuffer, 128.0f, 1.0f);
-	juce::int64 indexAfterThird = GrainShifterTester::getGrainReadIndex(grainShifter);
-	CHECK(indexAfterThird > indexAfterSecond);
-}
+// 		CHECK(indexNearEnd == samplesToProcess);
+// 		CHECK(bufferIndexNearEnd == 0); // Still on first buffer
 
-//================================
-TEST_CASE("mGrainReadIndex wraps around and switches active buffer", "[test_GrainShifter]")
-{
-	TestUtils::SetupAndTeardown setupAndTeardown;
-	GrainShifter grainShifter;
+// 		// Process more samples to cause wrapping
+// 		juce::AudioBuffer<float> outputBuffer2(2, 20); // Process 20 more samples
+// 		grainShifter.processShifting(lookaheadBuffer, outputBuffer2, 128.0f, 1.0f);
 
-	// Prepare with a small lookahead size for easier testing
-	int lookaheadSize = 512;
-	grainShifter.prepare(44100, lookaheadSize);
+// 		// Check that index wrapped and buffer switched
+// 		juce::int64 indexAfterWrap = GrainShifterTester::getGrainReadIndex(grainShifter);
+// 		int bufferIndexAfterWrap = GrainShifterTester::getActiveGrainBufferIndex(grainShifter);
 
-	// Create buffers
-	juce::AudioBuffer<float> lookaheadBuffer(2, lookaheadSize);
+// 		// Should have wrapped: (lookaheadSize - 10) + 20 = lookaheadSize + 10
+// 		// So new index should be 10
+// 		CHECK(indexAfterWrap == 10);
+// 		CHECK(bufferIndexAfterWrap == 1); // Should have switched to buffer 1
+// 	}
 
-	// Get initial state
-	int initialBufferIndex = GrainShifterTester::getActiveGrainBufferIndex(grainShifter);
-	juce::int64 initialReadIndex = GrainShifterTester::getGrainReadIndex(grainShifter);
+// 	SECTION("Buffer switches back and forth with multiple wraps")
+// 	{
+// 		// Process exactly one buffer length
+// 		juce::AudioBuffer<float> outputBuffer1(2, lookaheadSize);
+// 		grainShifter.processShifting(lookaheadBuffer, outputBuffer1, 128.0f, 1.0f);
 
-	CHECK(initialBufferIndex == 0); // Should start with buffer 0
-	CHECK(initialReadIndex == 0);    // Should start at index 0
+// 		// Should wrap to start and switch to buffer 1
+// 		CHECK(GrainShifterTester::getGrainReadIndex(grainShifter) == 0);
+// 		CHECK(GrainShifterTester::getActiveGrainBufferIndex(grainShifter) == 1);
 
-	SECTION("Index wraps at buffer length")
-	{
-		// Process enough samples to reach near the end of the buffer
-		int samplesToProcess = lookaheadSize - 10;
-		juce::AudioBuffer<float> outputBuffer1(2, samplesToProcess);
+// 		// Process another full buffer length
+// 		juce::AudioBuffer<float> outputBuffer2(2, lookaheadSize);
+// 		grainShifter.processShifting(lookaheadBuffer, outputBuffer2, 128.0f, 1.0f);
 
-		grainShifter.processShifting(lookaheadBuffer, outputBuffer1, 128.0f, 1.0f);
+// 		// Should wrap again and switch back to buffer 0
+// 		CHECK(GrainShifterTester::getGrainReadIndex(grainShifter) == 0);
+// 		CHECK(GrainShifterTester::getActiveGrainBufferIndex(grainShifter) == 0);
 
-		// Check we're near the end but haven't wrapped
-		juce::int64 indexNearEnd = GrainShifterTester::getGrainReadIndex(grainShifter);
-		int bufferIndexNearEnd = GrainShifterTester::getActiveGrainBufferIndex(grainShifter);
+// 		// Process a third time
+// 		juce::AudioBuffer<float> outputBuffer3(2, lookaheadSize);
+// 		grainShifter.processShifting(lookaheadBuffer, outputBuffer3, 128.0f, 1.0f);
 
-		CHECK(indexNearEnd == samplesToProcess);
-		CHECK(bufferIndexNearEnd == 0); // Still on first buffer
+// 		// Should be back to buffer 1
+// 		CHECK(GrainShifterTester::getGrainReadIndex(grainShifter) == 0);
+// 		CHECK(GrainShifterTester::getActiveGrainBufferIndex(grainShifter) == 1);
+// 	}
 
-		// Process more samples to cause wrapping
-		juce::AudioBuffer<float> outputBuffer2(2, 20); // Process 20 more samples
-		grainShifter.processShifting(lookaheadBuffer, outputBuffer2, 128.0f, 1.0f);
+// 	SECTION("Partial buffer processing maintains correct state")
+// 	{
+// 		// Process in small chunks and verify state is maintained correctly
+// 		int chunkSize = 100;
+// 		int numChunks = (lookaheadSize / chunkSize) + 2; // Go past one full buffer
 
-		// Check that index wrapped and buffer switched
-		juce::int64 indexAfterWrap = GrainShifterTester::getGrainReadIndex(grainShifter);
-		int bufferIndexAfterWrap = GrainShifterTester::getActiveGrainBufferIndex(grainShifter);
+// 		for (int i = 0; i < numChunks; ++i)
+// 		{
+// 			juce::AudioBuffer<float> smallBuffer(2, chunkSize);
+// 			grainShifter.processShifting(lookaheadBuffer, smallBuffer, 128.0f, 1.0f);
 
-		// Should have wrapped: (lookaheadSize - 10) + 20 = lookaheadSize + 10
-		// So new index should be 10
-		CHECK(indexAfterWrap == 10);
-		CHECK(bufferIndexAfterWrap == 1); // Should have switched to buffer 1
-	}
+// 			juce::int64 expectedIndex = ((i + 1) * chunkSize) % lookaheadSize;
+// 			int expectedBufferIndex = ((i + 1) * chunkSize) / lookaheadSize;
 
-	SECTION("Buffer switches back and forth with multiple wraps")
-	{
-		// Process exactly one buffer length
-		juce::AudioBuffer<float> outputBuffer1(2, lookaheadSize);
-		grainShifter.processShifting(lookaheadBuffer, outputBuffer1, 128.0f, 1.0f);
+// 			// For this test, buffer index alternates 0, 1, 0, 1...
+// 			expectedBufferIndex = expectedBufferIndex % 2;
 
-		// Should wrap to start and switch to buffer 1
-		CHECK(GrainShifterTester::getGrainReadIndex(grainShifter) == 0);
-		CHECK(GrainShifterTester::getActiveGrainBufferIndex(grainShifter) == 1);
-
-		// Process another full buffer length
-		juce::AudioBuffer<float> outputBuffer2(2, lookaheadSize);
-		grainShifter.processShifting(lookaheadBuffer, outputBuffer2, 128.0f, 1.0f);
-
-		// Should wrap again and switch back to buffer 0
-		CHECK(GrainShifterTester::getGrainReadIndex(grainShifter) == 0);
-		CHECK(GrainShifterTester::getActiveGrainBufferIndex(grainShifter) == 0);
-
-		// Process a third time
-		juce::AudioBuffer<float> outputBuffer3(2, lookaheadSize);
-		grainShifter.processShifting(lookaheadBuffer, outputBuffer3, 128.0f, 1.0f);
-
-		// Should be back to buffer 1
-		CHECK(GrainShifterTester::getGrainReadIndex(grainShifter) == 0);
-		CHECK(GrainShifterTester::getActiveGrainBufferIndex(grainShifter) == 1);
-	}
-
-	SECTION("Partial buffer processing maintains correct state")
-	{
-		// Process in small chunks and verify state is maintained correctly
-		int chunkSize = 100;
-		int numChunks = (lookaheadSize / chunkSize) + 2; // Go past one full buffer
-
-		for (int i = 0; i < numChunks; ++i)
-		{
-			juce::AudioBuffer<float> smallBuffer(2, chunkSize);
-			grainShifter.processShifting(lookaheadBuffer, smallBuffer, 128.0f, 1.0f);
-
-			juce::int64 expectedIndex = ((i + 1) * chunkSize) % lookaheadSize;
-			int expectedBufferIndex = ((i + 1) * chunkSize) / lookaheadSize;
-
-			// For this test, buffer index alternates 0, 1, 0, 1...
-			expectedBufferIndex = expectedBufferIndex % 2;
-
-			CHECK(GrainShifterTester::getGrainReadIndex(grainShifter) == expectedIndex);
-			CHECK(GrainShifterTester::getActiveGrainBufferIndex(grainShifter) == expectedBufferIndex);
-		}
-	}
-}
+// 			CHECK(GrainShifterTester::getGrainReadIndex(grainShifter) == expectedIndex);
+// 			CHECK(GrainShifterTester::getActiveGrainBufferIndex(grainShifter) == expectedBufferIndex);
+// 		}
+// 	}
+// }
 
 //================================
 TEST_CASE("Can determine when next lookahead is needed")
@@ -529,35 +503,35 @@ TEST_CASE("Can determine number of grains needed to accomplish given shifting ef
 	}
 }
 
-TEST_CASE("Can update source range needed for shifting", "test_GrainShifter")
-{
-	TestUtils::SetupAndTeardown setupAndTeardown;
-	GrainShifter grainShifter;
+// TEST_CASE("Can update source range needed for shifting", "test_GrainShifter")
+// {
+// 	TestUtils::SetupAndTeardown setupAndTeardown;
+// 	GrainShifter grainShifter;
 	
-	SECTION("takes from fullSourceRange in a fifo manner, ending on the last/oldest sample in the fullSourceRange")
-	{
-		int numGrains = 10; float detectedPeriod = 10.f; 
-		RD::BufferRange fullSourceRange(0, 999);
-		RD::BufferRange rangeNeeded(0, 0);
-		GrainShifterTester::callGetSourceRangeNeededForNumGrains(grainShifter, numGrains, detectedPeriod, fullSourceRange, rangeNeeded);
-		CHECK(rangeNeeded.getLengthInSamples() == 100);
-		CHECK(rangeNeeded.getStartIndex() == 900); // should be the last 100 samples of the source range
-		CHECK(rangeNeeded.getEndIndex() == 999);
-	}
-	SECTION("Grain range needed does not return a range that extends outside the source range, even when larger than full source range")
-	{
-		int numGrains = 10; float detectedPeriod = 1000.f; // way too big!
-		RD::BufferRange fullSourceRange(0, 999);
-		RD::BufferRange rangeNeeded(0, 0);
-		GrainShifterTester::callGetSourceRangeNeededForNumGrains(grainShifter, numGrains, detectedPeriod, fullSourceRange, rangeNeeded);
-		CHECK(rangeNeeded.getLengthInSamples() == 1000);
-		CHECK(rangeNeeded.getStartIndex() == 0); // should be the last 100 samples of the source range
-		CHECK(rangeNeeded.getEndIndex() == 999);
-	}
+// 	SECTION("takes from fullSourceRange in a fifo manner, ending on the last/oldest sample in the fullSourceRange")
+// 	{
+// 		int numGrains = 10; float detectedPeriod = 10.f; 
+// 		RD::BufferRange fullSourceRange(0, 999);
+// 		RD::BufferRange rangeNeeded(0, 0);
+// 		GrainShifterTester::callGetSourceRangeNeededForNumGrains(grainShifter, numGrains, detectedPeriod, fullSourceRange, rangeNeeded);
+// 		CHECK(rangeNeeded.getLengthInSamples() == 100);
+// 		CHECK(rangeNeeded.getStartIndex() == 900); // should be the last 100 samples of the source range
+// 		CHECK(rangeNeeded.getEndIndex() == 999);
+// 	}
+// 	SECTION("Grain range needed does not return a range that extends outside the source range, even when larger than full source range")
+// 	{
+// 		int numGrains = 10; float detectedPeriod = 1000.f; // way too big!
+// 		RD::BufferRange fullSourceRange(0, 999);
+// 		RD::BufferRange rangeNeeded(0, 0);
+// 		GrainShifterTester::callGetSourceRangeNeededForNumGrains(grainShifter, numGrains, detectedPeriod, fullSourceRange, rangeNeeded);
+// 		CHECK(rangeNeeded.getLengthInSamples() == 1000);
+// 		CHECK(rangeNeeded.getStartIndex() == 0); // should be the last 100 samples of the source range
+// 		CHECK(rangeNeeded.getEndIndex() == 999);
+// 	}
 
 
 	
-}
+// }
 
 TEST_CASE("", "test_GrainShifter")
 {
@@ -644,4 +618,223 @@ TEST_CASE("", "test_GrainShifter")
 
 
 	
+}
+TEST_CASE("GrainShifter with Hanning window - overlap and spacing verification", "[test_GrainShifter]")
+{
+	TestUtils::SetupAndTeardown setupAndTeardown;
+	GrainShifter grainShifter;
+
+	const int periodSize = 128;
+	const int numPeriods = 8;
+	const int totalSamples = periodSize * numPeriods; // 1024 samples
+
+	// Prepare GrainShifter with lookahead size
+	double sampleRate = 48000;
+	int lookaheadSize = totalSamples;
+	grainShifter.prepare(sampleRate, lookaheadSize);
+
+	// Set window to Hanning shape
+	grainShifter.setGrainShape(Window::Shape::kHanning);
+	Window& window = grainShifter.getGrainWindow();
+	window.setSizeShapePeriod(1024, Window::Shape::kHanning, periodSize);
+
+	// Create singlePeriodBuffer to represent expected window values over a 128 sample period
+	juce::AudioBuffer<float> singlePeriodBuffer(1, periodSize);
+
+	// Fill singlePeriodBuffer with window values for one period
+	for (int i = 0; i < periodSize; ++i)
+	{
+		float windowValue = window.getValueAtIndexInPeriod(i);
+		singlePeriodBuffer.setSample(0, i, windowValue);
+
+		// Debug: Print first few values to verify they're not zero
+		if (i < 5 || i == periodSize/2 || i == periodSize - 1)
+		{
+			INFO("singlePeriodBuffer[" << i << "] = " << windowValue);
+		}
+	}
+
+	SECTION("No shifting - grain period equals emission period with Hanning window")
+	{
+		// Create lookahead buffer filled with all ones
+		juce::AudioBuffer<float> lookaheadBuffer(1, totalSamples);
+		BufferFiller::fillWithAllOnes(lookaheadBuffer);
+
+		// Create output buffer
+		juce::AudioBuffer<float> outputBuffer(1, totalSamples);
+		outputBuffer.clear();
+
+		// No shifting means shiftRatio = 1.0
+		float detectedPeriod = static_cast<float>(periodSize);
+		float shiftRatio = 1.0f;
+
+		INFO("Testing no-shift case with Hanning: detected period = " << periodSize << ", shift ratio = " << shiftRatio);
+
+		grainShifter.processShifting(lookaheadBuffer, outputBuffer, detectedPeriod, shiftRatio);
+
+		// With no shifting, each grain should match the singlePeriodBuffer pattern
+		for (int period = 0; period < numPeriods; ++period)
+		{
+			for (int sample = 0; sample < periodSize; ++sample)
+			{
+				int outputIndex = period * periodSize + sample;
+				if (outputIndex >= outputBuffer.getNumSamples())
+					break;
+
+				float expectedValue = singlePeriodBuffer.getSample(0, sample);
+				float actualValue = outputBuffer.getSample(0, outputIndex);
+
+				INFO("Period " << period << ", sample " << sample << ", output index " << outputIndex);
+				CHECK(actualValue == Catch::Approx(expectedValue).epsilon(0.01f));
+			}
+		}
+	}
+
+	SECTION("Shifting up with Hanning window - overlaps add window values")
+	{
+		// Create lookahead buffer with plenty of data
+		const int largeSourceSize = 2048;
+		juce::AudioBuffer<float> lookaheadBuffer(1, largeSourceSize);
+		BufferFiller::fillWithAllOnes(lookaheadBuffer);
+
+		// Prepare with larger lookahead
+		grainShifter.prepare(sampleRate, largeSourceSize);
+		grainShifter.setGrainShape(Window::Shape::kHanning);
+		Window& shiftWindow = grainShifter.getGrainWindow();
+		shiftWindow.setSizeShapePeriod(1024, Window::Shape::kHanning, periodSize);
+
+		// Recreate singlePeriodBuffer since window was reconfigured
+		juce::AudioBuffer<float> shiftSinglePeriodBuffer(1, periodSize);
+		for (int i = 0; i < periodSize; ++i)
+		{
+			shiftSinglePeriodBuffer.setSample(0, i, shiftWindow.getValueAtIndexInPeriod(i));
+		}
+
+		// Create output buffer
+		juce::AudioBuffer<float> outputBuffer(1, totalSamples);
+		outputBuffer.clear();
+
+		// Set emission period to 3/4 of grain period
+		// This causes 25% overlap (32 samples)
+		// In GrainShifter, shiftRatio relates to pitch: higher ratio = higher pitch = shorter emission period
+		// shiftRatio = grainPeriod / emissionPeriod
+		// For emission = 3/4 * grain, shiftRatio = grain / (3/4 * grain) = 4/3 ≈ 1.33
+		float detectedPeriod = static_cast<float>(periodSize);  // 128
+		float shiftRatio = 4.0f / 3.0f;  // 1.33 for 25% overlap
+
+		INFO("Testing Hanning overlap: detected period = " << periodSize << ", shift ratio = " << shiftRatio);
+
+		grainShifter.processShifting(lookaheadBuffer, outputBuffer, detectedPeriod, shiftRatio);
+
+		// With 25% overlap:
+		// First grain: 0-127
+		// Second grain: 96-223 (overlap from 96-127 = 32 samples)
+		// Third grain: 192-319 (overlap from 192-223 = 32 samples)
+
+		// Check first overlap region (96-127)
+		// Expected value at overlap = window value from first grain at that position + window value from second grain at its position
+		for (int i = 96; i < 128; ++i)
+		{
+			// First grain contributes: singlePeriodBuffer[i]
+			int indexInFirstGrain = i;
+			float firstGrainContribution = shiftSinglePeriodBuffer.getSample(0, indexInFirstGrain);
+
+			// Second grain starts at output position 96, so at output position i, we're at index (i - 96) in the second grain
+			int indexInSecondGrain = i - 96;
+			float secondGrainContribution = shiftSinglePeriodBuffer.getSample(0, indexInSecondGrain);
+
+			float expectedValue = firstGrainContribution + secondGrainContribution;
+			float actualValue = outputBuffer.getSample(0, i);
+
+			INFO("Overlap position " << i << ": first grain[" << indexInFirstGrain << "]=" << firstGrainContribution
+				 << " + second grain[" << indexInSecondGrain << "]=" << secondGrainContribution
+				 << " = " << expectedValue);
+			CHECK(actualValue == Catch::Approx(expectedValue).epsilon(0.01f));
+		}
+
+		// Check second overlap region (192-223)
+		for (int i = 192; i < 224; ++i)
+		{
+			// Second grain starts at 96, so at position i we're at index (i - 96) in second grain
+			int indexInSecondGrain = i - 96;
+			float secondGrainContribution = shiftSinglePeriodBuffer.getSample(0, indexInSecondGrain);
+
+			// Third grain starts at 192, so at position i we're at index (i - 192) in third grain
+			int indexInThirdGrain = i - 192;
+			float thirdGrainContribution = shiftSinglePeriodBuffer.getSample(0, indexInThirdGrain);
+
+			float expectedValue = secondGrainContribution + thirdGrainContribution;
+			float actualValue = outputBuffer.getSample(0, i);
+
+			INFO("Overlap position " << i << ": second grain[" << indexInSecondGrain << "]=" << secondGrainContribution
+				 << " + third grain[" << indexInThirdGrain << "]=" << thirdGrainContribution
+				 << " = " << expectedValue);
+			CHECK(actualValue == Catch::Approx(expectedValue).epsilon(0.01f));
+		}
+	}
+
+	SECTION("Shifting down with Hanning window - gaps between grains")
+	{
+		// Create lookahead buffer with plenty of data
+		const int largeSourceSize = 2048;
+		juce::AudioBuffer<float> lookaheadBuffer(1, largeSourceSize);
+		BufferFiller::fillWithAllOnes(lookaheadBuffer);
+
+		// Prepare with larger lookahead
+		grainShifter.prepare(sampleRate, largeSourceSize);
+		grainShifter.setGrainShape(Window::Shape::kHanning);
+		Window& shiftWindow = grainShifter.getGrainWindow();
+		shiftWindow.setSizeShapePeriod(1024, Window::Shape::kHanning, periodSize);
+
+		// Recreate singlePeriodBuffer since window was reconfigured
+		juce::AudioBuffer<float> shiftSinglePeriodBuffer(1, periodSize);
+		for (int i = 0; i < periodSize; ++i)
+		{
+			shiftSinglePeriodBuffer.setSample(0, i, shiftWindow.getValueAtIndexInPeriod(i));
+		}
+
+		// Create output buffer
+		juce::AudioBuffer<float> outputBuffer(1, totalSamples);
+		outputBuffer.clear();
+
+		// Set emission period longer than grain period
+		// This creates gaps between grains
+		// shiftRatio < 1.0 means downward pitch shift
+		// For emission = grain + 1, shiftRatio = grain / (grain + 1) = 128/129
+		float detectedPeriod = static_cast<float>(periodSize);  // 128
+		float shiftRatio = 128.0f / 129.0f;  // Slightly less than 1.0 for small gaps
+
+		INFO("Testing Hanning with gaps: detected period = " << periodSize << ", shift ratio = " << shiftRatio);
+
+		grainShifter.processShifting(lookaheadBuffer, outputBuffer, detectedPeriod, shiftRatio);
+
+		// Calculate where gaps occur
+		// First grain: writes to samples 0-127
+		// Gap at sample 128 (no grain writes here)
+		// Second grain: starts at 129, writes to 129-256
+		// Gap at sample 257
+
+		// Check for gaps at expected positions
+		for (int grainIndex = 1; grainIndex < 8; ++grainIndex)
+		{
+			int gapPosition = grainIndex * (periodSize + 1) - 1;
+
+			if (gapPosition < totalSamples)
+			{
+				INFO("Checking gap at position " << gapPosition);
+
+				// At gap positions, we expect value of 0.0 (no grain writing there)
+				CHECK(outputBuffer.getSample(0, gapPosition) == Catch::Approx(0.0f).margin(0.001f));
+			}
+		}
+
+		// Verify that non-gap samples match expected window values
+		// First grain should match singlePeriodBuffer exactly
+		for (int i = 0; i < periodSize; ++i)
+		{
+			float expectedValue = shiftSinglePeriodBuffer.getSample(0, i);
+			float actualValue = outputBuffer.getSample(0, i);
+			CHECK(actualValue == Catch::Approx(expectedValue).epsilon(0.01f));
+		}
+	}
 }

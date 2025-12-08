@@ -12,7 +12,6 @@
 TEST_CASE("Granulator basic granulateBuffer functionality", "[test_Granulator]")
 {
 	TestUtils::SetupAndTeardown setupAndTeardown;
-	Granulator granulator;
 
 	// Create Window object for use in tests
 	Window window;
@@ -77,7 +76,7 @@ TEST_CASE("Granulator basic granulateBuffer functionality", "[test_Granulator]")
 	// Call granulateBuffer with the window object
 	float grainPeriod = static_cast<float>(periodSize);
 	float emissionPeriod = static_cast<float>(periodSize);
-	float finalGrainPhase = granulator.granulateBuffer(lookaheadBuffer, outputBuffer, grainPeriod, emissionPeriod, window);
+	float finalGrainPhase = Granulator::granulateBuffer(lookaheadBuffer, outputBuffer, grainPeriod, emissionPeriod, window);
 
 	// Since grains fit perfectly (8 periods of 128 samples each in a 1024 buffer),
 	// no grain extends past the buffer, so phase should be 0.0
@@ -102,7 +101,6 @@ TEST_CASE("Granulator basic granulateBuffer functionality", "[test_Granulator]")
 TEST_CASE("Granulator source buffer size validation", "[test_Granulator]")
 {
 	TestUtils::SetupAndTeardown setupAndTeardown;
-	Granulator granulator;
 
 	// Create Window object for use in tests
 	Window window;
@@ -127,7 +125,7 @@ TEST_CASE("Granulator source buffer size validation", "[test_Granulator]")
 		float emissionPeriod = static_cast<float>(grainSize);
 
 		// This should return 0.0 since no grain can be processed
-		float finalGrainPhase = granulator.granulateBuffer(inputBuffer, outputBuffer, grainPeriod, emissionPeriod, window);
+		float finalGrainPhase = Granulator::granulateBuffer(inputBuffer, outputBuffer, grainPeriod, emissionPeriod, window);
 		CHECK(finalGrainPhase == 0.0f);
 
 		// Output buffer should remain cleared (all zeros) since no processing occurred
@@ -154,7 +152,7 @@ TEST_CASE("Granulator source buffer size validation", "[test_Granulator]")
 		float grainPeriod = static_cast<float>(grainSize);
 		float emissionPeriod = static_cast<float>(grainSize);
 
-		float finalGrainPhase = granulator.granulateBuffer(inputBuffer, outputBuffer, grainPeriod, emissionPeriod, window);
+		float finalGrainPhase = Granulator::granulateBuffer(inputBuffer, outputBuffer, grainPeriod, emissionPeriod, window);
 
 		// First grain should be written successfully
 		for (int i = 0; i < grainSize; ++i)
@@ -168,7 +166,6 @@ TEST_CASE("Granulator source buffer size validation", "[test_Granulator]")
 TEST_CASE("Granulator assertion check for insufficient source buffer", "[test_Granulator]")
 {
 	TestUtils::SetupAndTeardown setupAndTeardown;
-	Granulator granulator;
 
 	// Create Window object for use in tests
 	Window window;
@@ -205,13 +202,13 @@ TEST_CASE("Granulator assertion check for insufficient source buffer", "[test_Gr
 		BufferFiller::fillIncremental(boundaryBuffer);
 
 		// This should NOT assert since buffer size equals grain size
-		float boundaryResult = granulator.granulateBuffer(boundaryBuffer, outputBuffer, grainPeriod, emissionPeriod, window);
+		float boundaryResult = Granulator::granulateBuffer(boundaryBuffer, outputBuffer, grainPeriod, emissionPeriod, window);
 
 		// The test passes if we reach here without aborting
 		SUCCEED("Assertion protection is in place - boundary case handled correctly");
 #else
 		// In RELEASE mode, verify graceful handling
-		float result = granulator.granulateBuffer(inputBuffer, outputBuffer, grainPeriod, emissionPeriod, window);
+		float result = Granulator::granulateBuffer(inputBuffer, outputBuffer, grainPeriod, emissionPeriod, window);
 
 		// Should return 0.0 and not crash
 		CHECK(result == 0.0f);
@@ -230,7 +227,6 @@ TEST_CASE("Granulator assertion check for insufficient source buffer", "[test_Gr
 TEST_CASE("Granulator validation for insufficient source buffer", "[test_Granulator]")
 {
 	TestUtils::SetupAndTeardown setupAndTeardown;
-	Granulator granulator;
 
 	// Create Window object for use in tests
 	Window window;
@@ -256,7 +252,7 @@ TEST_CASE("Granulator validation for insufficient source buffer", "[test_Granula
 #if !JUCE_DEBUG
 		// Only test the graceful return in release mode
 		// In debug mode, this would abort due to assertion
-		float finalGrainPhase = granulator.granulateBuffer(inputBuffer, outputBuffer, grainPeriod, emissionPeriod, window);
+		float finalGrainPhase = Granulator::granulateBuffer(inputBuffer, outputBuffer, grainPeriod, emissionPeriod, window);
 
 		// Verify return value is 0.0
 		CHECK(finalGrainPhase == 0.0f);
@@ -290,7 +286,7 @@ TEST_CASE("Granulator validation for insufficient source buffer", "[test_Granula
 
 #if !JUCE_DEBUG
 		// Only test in release mode
-		float finalGrainPhase = granulator.granulateBuffer(inputBuffer, outputBuffer, grainPeriod, emissionPeriod, window);
+		float finalGrainPhase = Granulator::granulateBuffer(inputBuffer, outputBuffer, grainPeriod, emissionPeriod, window);
 		CHECK(finalGrainPhase == 0.0f);
 
 		// Output should remain empty
@@ -307,7 +303,6 @@ TEST_CASE("Granulator validation for insufficient source buffer", "[test_Granula
 TEST_CASE("Granulator returns correct phase for partial final grain", "[test_Granulator]")
 {
 	TestUtils::SetupAndTeardown setupAndTeardown;
-	Granulator granulator;
 
 	// Create Window object for use in tests
 	Window window;
@@ -330,7 +325,7 @@ TEST_CASE("Granulator returns correct phase for partial final grain", "[test_Gra
 		// Granulate with grain period = 128, emission period = 128
 		float grainPeriod = static_cast<float>(grainSize);
 		float emissionPeriod = static_cast<float>(grainSize);
-		float finalGrainPhase = granulator.granulateBuffer(inputBuffer, outputBuffer, grainPeriod, emissionPeriod, window);
+		float finalGrainPhase = Granulator::granulateBuffer(inputBuffer, outputBuffer, grainPeriod, emissionPeriod, window);
 
 		// First grain: writes samples 0-127 (full grain)
 		// Second grain: starts at sample 128, would end at 255
@@ -356,7 +351,7 @@ TEST_CASE("Granulator returns correct phase for partial final grain", "[test_Gra
 		// Granulate with grain period = 100, emission period = 100
 		float grainPeriod = static_cast<float>(grainSize);
 		float emissionPeriod = static_cast<float>(grainSize);
-		float finalGrainPhase = granulator.granulateBuffer(inputBuffer, outputBuffer, grainPeriod, emissionPeriod, window);
+		float finalGrainPhase = Granulator::granulateBuffer(inputBuffer, outputBuffer, grainPeriod, emissionPeriod, window);
 
 		// First grain: writes samples 0-99 (full grain)
 		// Second grain: starts at sample 100, would end at 199
@@ -382,7 +377,7 @@ TEST_CASE("Granulator returns correct phase for partial final grain", "[test_Gra
 		// Granulate with grain period = 64, emission period = 64
 		float grainPeriod = static_cast<float>(grainSize);
 		float emissionPeriod = static_cast<float>(grainSize);
-		float finalGrainPhase = granulator.granulateBuffer(inputBuffer, outputBuffer, grainPeriod, emissionPeriod, window);
+		float finalGrainPhase = Granulator::granulateBuffer(inputBuffer, outputBuffer, grainPeriod, emissionPeriod, window);
 
 		// All grains fit perfectly in output buffer, no grain extends past buffer
 		CHECK(finalGrainPhase == 0.0f);
@@ -405,7 +400,7 @@ TEST_CASE("Granulator returns correct phase for partial final grain", "[test_Gra
 		// Granulate with emission period same as grain period (no overlap)
 		float grainPeriod = static_cast<float>(grainSize);
 		float emissionPeriod = static_cast<float>(grainSize);
-		float finalGrainPhase = granulator.granulateBuffer(inputBuffer, outputBuffer, grainPeriod, emissionPeriod, window);
+		float finalGrainPhase = Granulator::granulateBuffer(inputBuffer, outputBuffer, grainPeriod, emissionPeriod, window);
 
 		// First grain: 0-99
 		// Second grain: 100-199
@@ -419,7 +414,6 @@ TEST_CASE("Granulator returns correct phase for partial final grain", "[test_Gra
 TEST_CASE("Granulator with all ones buffer - overlap and spacing verification", "[test_Granulator]")
 {
 	TestUtils::SetupAndTeardown setupAndTeardown;
-	Granulator granulator;
 
 	// Create Window object with no windowing
 	Window window;
@@ -454,7 +448,7 @@ TEST_CASE("Granulator with all ones buffer - overlap and spacing verification", 
 		float grainPeriod = static_cast<float>(periodSize);
 		float emissionPeriod = static_cast<float>(periodSize);
 
-		float finalPhase = granulator.granulateBuffer(sourceBuffer, outputBuffer, grainPeriod, emissionPeriod, window);
+		float finalPhase = Granulator::granulateBuffer(sourceBuffer, outputBuffer, grainPeriod, emissionPeriod, window);
 
 		// With no shifting, all output samples should be 1.0
 		INFO("Testing no-shift case: grain period = " << periodSize << ", emission period = " << periodSize);
@@ -485,7 +479,7 @@ TEST_CASE("Granulator with all ones buffer - overlap and spacing verification", 
 
 		INFO("Testing pitch shift up: grain period = " << periodSize << ", emission period = " << (periodSize - 1));
 
-		float finalPhase = granulator.granulateBuffer(sourceBuffer, outputBuffer, grainPeriod, emissionPeriod, window);
+		float finalPhase = Granulator::granulateBuffer(sourceBuffer, outputBuffer, grainPeriod, emissionPeriod, window);
 
 		// Calculate where overlaps occur
 		// First grain: writes to samples 0-127
@@ -537,7 +531,7 @@ TEST_CASE("Granulator with all ones buffer - overlap and spacing verification", 
 
 		INFO("Testing pitch shift down: grain period = " << periodSize << ", emission period = " << (periodSize + 1));
 
-		float finalPhase = granulator.granulateBuffer(sourceBuffer, outputBuffer, grainPeriod, emissionPeriod, window);
+		float finalPhase = Granulator::granulateBuffer(sourceBuffer, outputBuffer, grainPeriod, emissionPeriod, window);
 
 		// Calculate where gaps occur
 		// First grain: writes to samples 0-127
@@ -591,7 +585,7 @@ TEST_CASE("Granulator with all ones buffer - overlap and spacing verification", 
 
 		INFO("Testing 25% overlap: grain period = " << periodSize << ", emission period = " << (periodSize * 3 / 4));
 
-		float finalPhase = granulator.granulateBuffer(sourceBuffer, outputBuffer, grainPeriod, emissionPeriod, window);
+		float finalPhase = Granulator::granulateBuffer(sourceBuffer, outputBuffer, grainPeriod, emissionPeriod, window);
 
 		// With 25% overlap, we should see regions where samples sum to 2.0
 		// First grain: 0-127
@@ -615,7 +609,6 @@ TEST_CASE("Granulator with all ones buffer - overlap and spacing verification", 
 TEST_CASE("Granulator upward pitch shift with equal-sized buffers", "[test_Granulator]")
 {
 	TestUtils::SetupAndTeardown setupAndTeardown;
-	Granulator granulator;
 
 	// Create Window object with no windowing
 	Window window;
@@ -649,7 +642,7 @@ TEST_CASE("Granulator upward pitch shift with equal-sized buffers", "[test_Granu
 		INFO("Grain period: " << periodSize << ", Emission period: " << (periodSize * 3 / 4));
 		INFO("Buffer size (both input and output): " << bufferSize);
 
-		float finalPhase = granulator.granulateBuffer(inputBuffer, outputBuffer, grainPeriod, emissionPeriod, window);
+		float finalPhase = Granulator::granulateBuffer(inputBuffer, outputBuffer, grainPeriod, emissionPeriod, window);
 
 		// Calculate expected behavior:
 		// We read grains of 128 samples from input
@@ -724,7 +717,7 @@ TEST_CASE("Granulator upward pitch shift with equal-sized buffers", "[test_Granu
 		INFO("Testing aggressive upward pitch shift (2x speed)");
 		INFO("Grain period: " << periodSize << ", Emission period: " << (periodSize / 2));
 
-		float finalPhase = granulator.granulateBuffer(inputBuffer, outputBuffer, grainPeriod, emissionPeriod, window);
+		float finalPhase = Granulator::granulateBuffer(inputBuffer, outputBuffer, grainPeriod, emissionPeriod, window);
 
 		// With emission period = 64 and grain period = 128:
 		// We consume input at double speed
@@ -753,7 +746,6 @@ TEST_CASE("Granulator upward pitch shift with equal-sized buffers", "[test_Granu
 TEST_CASE("Granulator time-preserving mode with all ones buffer", "[test_Granulator]")
 {
 	TestUtils::SetupAndTeardown setupAndTeardown;
-	Granulator granulator;
 
 	// Create Window object with no windowing
 	Window window;
@@ -787,7 +779,7 @@ TEST_CASE("Granulator time-preserving mode with all ones buffer", "[test_Granula
 		INFO("Buffer size (both input and output): " << bufferSize);
 
 		// Call with timePreserving = true
-		float finalPhase = granulator.granulateBuffer(inputBuffer, outputBuffer, grainPeriod, emissionPeriod, window, true);
+		float finalPhase = Granulator::granulateBuffer(inputBuffer, outputBuffer, grainPeriod, emissionPeriod, window, true);
 
 		// In time-preserving mode, grains are repeated as needed
 		// So we should NEVER have zeros at the end of the output buffer
@@ -850,7 +842,7 @@ TEST_CASE("Granulator time-preserving mode with all ones buffer", "[test_Granula
 		INFO("Grain period: " << periodSize << ", Emission period: " << (periodSize / 2));
 
 		// Call with timePreserving = true
-		float finalPhase = granulator.granulateBuffer(inputBuffer, outputBuffer, grainPeriod, emissionPeriod, window, true);
+		float finalPhase = Granulator::granulateBuffer(inputBuffer, outputBuffer, grainPeriod, emissionPeriod, window, true);
 
 		// With emission period = 64 and grain period = 128:
 		// Grain starts: 0, 64, 128, 192, 256, 320, 384, 448, 512, 576, 640, 704, 768, 832, 896, 960
@@ -893,7 +885,6 @@ TEST_CASE("Granulator time-preserving mode with all ones buffer", "[test_Granula
 TEST_CASE("Granulator with Hanning window - overlap and spacing verification", "[test_Granulator]")
 {
 	TestUtils::SetupAndTeardown setupAndTeardown;
-	Granulator granulator;
 
 	// Create Window object with Hanning shape
 	Window window;
@@ -933,7 +924,7 @@ TEST_CASE("Granulator with Hanning window - overlap and spacing verification", "
 		float grainPeriod = static_cast<float>(periodSize);
 		float emissionPeriod = static_cast<float>(periodSize);
 
-		float finalPhase = granulator.granulateBuffer(sourceBuffer, outputBuffer, grainPeriod, emissionPeriod, window, true);
+		float finalPhase = Granulator::granulateBuffer(sourceBuffer, outputBuffer, grainPeriod, emissionPeriod, window, true);
 
 		// With no shifting, each grain should match the singlePeriodBuffer pattern
 		INFO("Testing no-shift case with Hanning: grain period = " << periodSize << ", emission period = " << periodSize);
@@ -973,7 +964,7 @@ TEST_CASE("Granulator with Hanning window - overlap and spacing verification", "
 
 		INFO("Testing Hanning overlap: grain period = " << periodSize << ", emission period = " << (periodSize * 3 / 4));
 
-		float finalPhase = granulator.granulateBuffer(sourceBuffer, outputBuffer, grainPeriod, emissionPeriod, window);
+		float finalPhase = Granulator::granulateBuffer(sourceBuffer, outputBuffer, grainPeriod, emissionPeriod, window);
 
 		// With 25% overlap:
 		// First grain: 0-127
@@ -1040,7 +1031,7 @@ TEST_CASE("Granulator with Hanning window - overlap and spacing verification", "
 
 		INFO("Testing Hanning with gaps: grain period = " << periodSize << ", emission period = " << (periodSize + 1));
 
-		float finalPhase = granulator.granulateBuffer(sourceBuffer, outputBuffer, grainPeriod, emissionPeriod, window, true);
+		float finalPhase = Granulator::granulateBuffer(sourceBuffer, outputBuffer, grainPeriod, emissionPeriod, window, true);
 
 		// Calculate where gaps occur
 		// First grain: writes to samples 0-127

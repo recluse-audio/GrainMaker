@@ -19,7 +19,7 @@ public:
 	Granulator();
 	~Granulator() = default;
 
-	
+
 	/**
 	 * @brief Granulates an input buffer and writes to output buffer with specified grain and emission periods
 	 * As of 2025-10-21 I am deciding to make this use a "varispeed/tape speedup" technique as opposed to a "repeat grain" type granulating
@@ -31,10 +31,10 @@ public:
 	 * @param window Window function to apply to grains
 	 * @return Normalized phase position (0.0-1.0) representing completion percentage of final grain written
 	 */
-	float granulateBuffer(juce::AudioBuffer<float>& bufferToGranulate, juce::AudioBuffer<float>& bufferToWriteTo,
+	static float granulateBuffer(juce::AudioBuffer<float>& bufferToGranulate, juce::AudioBuffer<float>& bufferToWriteTo,
 		float grainPeriod, float emissionPeriod, Window& window, bool timePreserving = false);
 
-	
+
 
 
 private:
