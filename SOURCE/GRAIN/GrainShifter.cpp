@@ -1,5 +1,6 @@
 #include "GrainShifter.h"
 #include "../../SUBMODULES/RD/SOURCE/BufferHelper.h"
+#include "Granulator.h"
 
 GrainShifter::GrainShifter()
 {
@@ -43,22 +44,11 @@ Window& GrainShifter::getGrainWindow()
 
 void GrainShifter::processShifting(juce::AudioBuffer<float>& lookaheadBuffer, juce::AudioBuffer<float>& outputBuffer, float detectedPeriod, float shiftRatio)
 {
-	int numSamples = outputBuffer.getNumSamples();
-	int numChannels = outputBuffer.getNumChannels();
-
-	// Process each sample in the output buffer
-	for (int sampleIdx = 0; sampleIdx < numSamples; ++sampleIdx)
-	{
-		// Read the current sample for all channels
-		for (int channel = 0; channel < numChannels; ++channel)
-		{
-			float sample = _readNextGrainSample(channel);
-			outputBuffer.setSample(channel, sampleIdx, sample);
-		}
-
-		// Increment the read index once per sample (not per channel)
-		_incrementGrainReadIndex();
-	}
+	if(detectedPeriod < 50 || shiftRatio < 0.5 || shiftRatio > 1.5)
+		return;
+		
+	float periodAfterShifting = detectedPeriod * shiftRatio;
+	Granulator::granulateBuffer(lookaheadBuffer, outputBuffer, detectedPeriod, periodAfterShifting, mWindow, true);
 }
 
 

@@ -165,6 +165,8 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
     float detected_period = mPitchDetector->process(mLookaheadBuffer);
 
+	mGrainShifter->processShifting(mLookaheadBuffer, buffer, detected_period, mShiftRatio);
+
 }
 
 //==============================================================================
