@@ -12,7 +12,8 @@ Granulator::Granulator()
 	// No longer initialize Window here - it will be passed by reference
 }
 
-float Granulator::granulateBuffer(juce::AudioBuffer<float>& bufferToGranulate, juce::AudioBuffer<float>& bufferToWriteTo, float grainPeriod, float emissionPeriod, Window& window, bool timePreserving)
+float Granulator::granulateBuffer(juce::AudioBuffer<float>& bufferToGranulate, juce::AudioBuffer<float>& bufferToWriteTo, 
+									float grainPeriod, float emissionPeriod, Window& window, bool timePreserving)
 {
 	window.setPeriod(grainPeriod);
 
