@@ -1,8 +1,6 @@
 set(SOURCES
     SOURCE/GRAIN/GrainBuffer.cpp
     SOURCE/GRAIN/GrainBuffer.h
-    SOURCE/GRAIN/GrainShifter.cpp
-    SOURCE/GRAIN/GrainShifter.h
     SOURCE/GRAIN/Granulator.cpp
     SOURCE/GRAIN/Granulator.h
     SOURCE/PITCH/PitchDetector.cpp

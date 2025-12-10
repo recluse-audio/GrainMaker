@@ -1,8 +1,9 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 #include "PITCH/PitchDetector.h"
-#include "GRAIN/GrainShifter.h"
+#include "GRAIN/Granulator.h"
 #include "../SUBMODULES/RD/SOURCE/CircularBuffer.h"
+#include "../SUBMODULES/RD/SOURCE/Window.h"
 
 //==============================================================================
 PluginProcessor::PluginProcessor()
@@ -11,7 +12,9 @@ PluginProcessor::PluginProcessor()
 {
     mPitchDetector = std::make_unique<PitchDetector>();
     mCircularBuffer = std::make_unique<CircularBuffer>();
-	mGrainShifter = std::make_unique<GrainShifter>();
+	mGranulator = std::make_unique<Granulator>();
+	mWindow = std::make_unique<Window>();
+
 
 	mShiftRatio = 1.f;
 	
@@ -25,7 +28,8 @@ PluginProcessor::~PluginProcessor()
 {
 	mCircularBuffer.reset();
     mPitchDetector.reset();
-    mGrainShifter.reset();
+    mGranulator.reset();
+	mWindow.reset();
 }
 
 //==============================================================================
@@ -113,7 +117,7 @@ void PluginProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     mCircularBuffer->setSize(this->getNumOutputChannels(), (int)sampleRate * 2); // by default 1 second
     mCircularBuffer->setDelay(lookaheadNumSamples);
 
-	mGrainShifter->prepare(sampleRate, lookaheadBufferNumSamples);
+	mWindow->setSizeShapePeriod(sampleRate, Window::Shape::kHanning, samplesPerBlock); // period updated after pitch detection
 
 }
 
@@ -165,7 +169,13 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 
     float detected_period = mPitchDetector->process(mLookaheadBuffer);
 
-	mGrainShifter->processShifting(mLookaheadBuffer, buffer, detected_period, mShiftRatio);
+	if(mShiftRatio < 0.5 || mShiftRatio > 1.5 || detected_period < 2)
+		return;
+		
+	float periodAfterShifting = detected_period / mShiftRatio;
+
+	// window period set in this function. Need to pass detected_period anyways
+	mGranulator->granulateBuffer(mLookaheadBuffer, buffer, detected_period, periodAfterShifting, *mWindow.get(), false);
 
 }
 

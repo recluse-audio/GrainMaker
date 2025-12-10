@@ -4,7 +4,8 @@
 
 class CircularBuffer;
 class PitchDetector;
-class GrainShifter;
+class Granulator;
+class Window;
 
 #if (MSVC)
 #include "ipps.h"
@@ -55,14 +56,13 @@ public:
    // AudioProcessorValueTreeState::Listener callback
     void parameterChanged(const juce::String& parameterID, float newValue) override;
 
-	// For testing purposes - provides access to GrainShifter
-	GrainShifter* getGrainShifter() { return mGrainShifter.get(); }
 
 private:
 	float mShiftRatio = 1.f;
     std::unique_ptr<PitchDetector> mPitchDetector;
-    std::unique_ptr<GrainShifter> mGrainShifter;
-    std::unique_ptr<CircularBuffer> mCircularBuffer;
+    std::unique_ptr<Granulator> mGranulator;
+    std::unique_ptr<CircularBuffer> mCircularBuffer; 
+	std::unique_ptr<Window> mWindow;
 
 	juce::AudioBuffer<float> mLookaheadBuffer;
 
