@@ -14,6 +14,7 @@ PluginProcessor::PluginProcessor()
     mCircularBuffer = std::make_unique<CircularBuffer>();
 	mGranulator = std::make_unique<Granulator>();
 	mWindow = std::make_unique<Window>();
+	mWindow->setLooping(true);
 
 
 	mShiftRatio = 1.f;
