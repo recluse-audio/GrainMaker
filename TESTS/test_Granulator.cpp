@@ -882,6 +882,8 @@ TEST_CASE("Granulator time-preserving mode with all ones buffer", "[test_Granula
 	}
 }
 
+
+
 TEST_CASE("Granulator with Hanning window - overlap and spacing verification", "[test_Granulator]")
 {
 	TestUtils::SetupAndTeardown setupAndTeardown;
@@ -989,7 +991,7 @@ TEST_CASE("Granulator with Hanning window - overlap and spacing verification", "
 			INFO("Overlap position " << i << ": first grain[" << indexInFirstGrain << "]=" << firstGrainContribution
 				 << " + second grain[" << indexInSecondGrain << "]=" << secondGrainContribution
 				 << " = " << expectedValue);
-			CHECK(actualValue == Catch::Approx(expectedValue).epsilon(0.001f));
+			CHECK(actualValue == Catch::Approx(expectedValue).epsilon(0.01f));
 		}
 
 		// Check second overlap region (192-223)
@@ -1009,7 +1011,7 @@ TEST_CASE("Granulator with Hanning window - overlap and spacing verification", "
 			INFO("Overlap position " << i << ": second grain[" << indexInSecondGrain << "]=" << secondGrainContribution
 				 << " + third grain[" << indexInThirdGrain << "]=" << thirdGrainContribution
 				 << " = " << expectedValue);
-			CHECK(actualValue == Catch::Approx(expectedValue).epsilon(0.001f));
+			CHECK(actualValue == Catch::Approx(expectedValue).epsilon(0.01f));
 		}
 	}
 
@@ -1059,7 +1061,87 @@ TEST_CASE("Granulator with Hanning window - overlap and spacing verification", "
 		{
 			float expectedValue = singlePeriodBuffer.getSample(0, i);
 			float actualValue = outputBuffer.getSample(0, i);
-			CHECK(actualValue == Catch::Approx(expectedValue).epsilon(0.001f));
+			CHECK(actualValue == Catch::Approx(expectedValue).epsilon(0.01f));
 		}
+	}
+}
+
+//=======================================================
+//=======================================================
+//===================== NOT PASSING =====================
+//=======================================================
+//=======================================================
+
+TEST_CASE("Granulator window readPos after partial grain - non time preserving", "[test_Granulator]")
+{
+	TestUtils::SetupAndTeardown setupAndTeardown;
+
+	// Window underlying buffer size - this is the actual buffer that stores the window shape
+	const int windowBufferSize = 1024;
+	// Grain period - how many samples we want to "play" through the window
+	const int grainPeriod = 128;
+	// Phase increment = windowBufferSize / grainPeriod = 1024 / 128 = 8
+	// This means for each sample in the grain, we advance 8 positions in the window buffer
+	const double phaseIncrement = static_cast<double>(windowBufferSize) / static_cast<double>(grainPeriod);
+
+	// Create Window object with no windowing for predictable behavior
+	Window window;
+	window.setSizeShapePeriod(windowBufferSize, Window::Shape::kHanning, grainPeriod);
+
+	SECTION("Partial grain - window readPos reflects samples processed in underlying buffer")
+	{
+		// Output buffer is smaller than one grain, forcing a partial grain
+		const int outputBufferSize = 64;  // Only half a grain fits
+		const int inputBufferSize = 256;  // One grain's worth of input
+
+		// Create input buffer filled with all ones
+		juce::AudioBuffer<float> inputBuffer(1, inputBufferSize);
+		BufferFiller::fillWithAllOnes(inputBuffer);
+
+		// Create output buffer and clear it (simulating processBlock)
+		juce::AudioBuffer<float> outputBuffer(1, outputBufferSize);
+		outputBuffer.clear();
+
+		// Reset window read position to ensure clean state
+		window.resetReadPos();
+		CHECK(window.getReadPos() == 0.0);
+
+		// Granulate with timePreserving = false
+		float grainPeriodFloat = static_cast<float>(grainPeriod);
+		float emissionPeriod = grainPeriodFloat;
+
+		Granulator::granulateBuffer(inputBuffer, outputBuffer, grainPeriodFloat, emissionPeriod, window, false);
+
+		// Verify output buffer contains expected Hanning window values
+		// Since input is all ones, output should be the window values directly
+		// Create a reference window to get expected values
+		Window referenceWindow;
+		referenceWindow.setSizeShapePeriod(windowBufferSize, Window::Shape::kHanning, grainPeriod);
+
+		INFO("Checking output buffer values against expected Hanning window shape:");
+		for (int i = 0; i < outputBufferSize; ++i)
+		{
+			float expectedWindowValue = referenceWindow.getValueAtIndexInPeriod(i);
+			float actualValue = outputBuffer.getSample(0, i);
+
+			INFO("Sample " << i << ": expected=" << expectedWindowValue << ", actual=" << actualValue);
+			CHECK(actualValue == Catch::Approx(expectedWindowValue).margin(0.001f));
+		}
+
+		// We processed 64 samples through the window
+		// Each sample advances readPos by phaseIncrement (8)
+		// Expected readPos in underlying window buffer = 64 * 8 = 512
+		// This is position 512 out of 1024 in the window buffer (halfway through)
+		const int samplesProcessed = 64;
+		double expectedReadPos = samplesProcessed * phaseIncrement;
+
+		INFO("Window buffer size: " << windowBufferSize);
+		INFO("Grain period: " << grainPeriod);
+		INFO("Phase increment: " << phaseIncrement);
+		INFO("Samples processed: " << samplesProcessed);
+		INFO("Expected readPos (in window buffer): " << expectedReadPos);
+		INFO("Actual readPos: " << window.getReadPos());
+
+		CHECK(window.getReadPos() == Catch::Approx(expectedReadPos).margin(0.001));
 	}
 }

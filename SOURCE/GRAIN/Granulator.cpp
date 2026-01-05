@@ -16,33 +16,51 @@ float Granulator::granulateBuffer(juce::AudioBuffer<float>& bufferToGranulate, j
 									float grainPeriod, float emissionPeriod, Window& window, bool timePreserving)
 {
 	window.setPeriod(grainPeriod);
+	window.setLooping(true);
+	//window.setCurrentReadPosWithNormalizedPhase(mFinalGrainNormalizedPhase);
 
 	// Clear output buffer first
 	bufferToWriteTo.clear();
 
 	const int sourceNumSamples = bufferToGranulate.getNumSamples();
 	const int outputNumSamples = bufferToWriteTo.getNumSamples();
-	const int grainSize = static_cast<int>(grainPeriod);
-	const int emissionStep = static_cast<int>(emissionPeriod);
+
+
 
 	// Assert that source buffer is at least big enough for one whole grain
-	jassert(sourceNumSamples >= grainSize);
+	jassert(sourceNumSamples >= grainPeriod);
 
 	// Early return if source buffer is too small
-	if (sourceNumSamples < grainSize)
+	if (sourceNumSamples < grainPeriod)
 		return 0.0f;
 
 	// Track positions in source and output buffers
 	int readPos = 0;
 	int writePos = 0;
 
-	// Default to 0.0 if no grain extends past the buffer
-	float finalGrainPhase = 0.0f;
 
 	// Process grains until we run out of output space
 	while (readPos < sourceNumSamples)
-	{
-		window.resetReadPos();
+	{ 
+		// These can be modified if handling a partial grain that starts midway through grain phase
+		int grainSize = static_cast<int>(grainPeriod);
+		int emissionStep = static_cast<int>(emissionPeriod);
+
+		// first grain might be partial
+		if(readPos = 0)
+		{
+			// if previous grain was 55% complete it would write 45% in this block
+			float percentOfGrainSpillover = 1.f - window.getCurrentNormalizedPhase();
+			grainSize = (int)(grainPeriod * percentOfGrainSpillover);
+			
+			// use full grain size
+			// add Emission step as if starting from start of prev blocks final grain
+			// 
+			float percentOfGrainFromPrevBlock = window.getCurrentNormalizedPhase();
+			int prevPartialGrainNumSamples = (int)(grainSize * percentOfGrainFromPrevBlock);
+			emissionStep = (int)(emissionStep - prevPartialGrainNumSamples);
+		}
+
 		// Calculate grain read range
 		int readEndPos = readPos + grainSize - 1;
 		if (readEndPos >= sourceNumSamples)
@@ -58,11 +76,11 @@ float Granulator::granulateBuffer(juce::AudioBuffer<float>& bufferToGranulate, j
 			// This is the final grain that extends past the buffer
 			writeEndPos = outputNumSamples - 1;
 
-			// Calculate how much of this grain we actually wrote
-			int samplesWritten = writeEndPos - writePos + 1;
+			// // Calculate how much of this grain we actually wrote
+			// int samplesWritten = writeEndPos - writePos + 1;
 
-			// Calculate the normalized phase position (0.0 to 1.0)
-			finalGrainPhase = static_cast<float>(samplesWritten) / grainPeriod;
+			// // Calculate the normalized phase position (0.0 to 1.0)
+			// finalGrainPhase = static_cast<float>(samplesWritten) / grainPeriod;
 		}
 
 		RD::BufferRange writeRange(writePos, writeEndPos);
@@ -78,6 +96,7 @@ float Granulator::granulateBuffer(juce::AudioBuffer<float>& bufferToGranulate, j
 
 		// Update positions
 		writePos += emissionStep;
+
 		if(timePreserving) // time preserving repeats grains as needed
 		{
 			// The emission of the next grain start aka writePos will occur before the completion of 
@@ -98,5 +117,5 @@ float Granulator::granulateBuffer(juce::AudioBuffer<float>& bufferToGranulate, j
 			break;
 	}
 
-	return finalGrainPhase;
+	return 0.f;
 }

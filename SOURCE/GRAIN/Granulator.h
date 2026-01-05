@@ -38,6 +38,7 @@ public:
 
 
 private:
+	float mFinalGrainNormalizedPhase = 1.f;
 	// Window is no longer stored internally - passed by reference to granulateBuffer
 
  };
