@@ -1,6 +1,6 @@
 ## JOURNAL ##
 
-A general note catch-all for development of ArtieTune
+A general note catch-all for development of GrainMaker
 
 
 ---

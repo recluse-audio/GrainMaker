@@ -36,7 +36,7 @@ PluginProcessor::~PluginProcessor()
 //==============================================================================
 const juce::String PluginProcessor::getName() const
 {
-    return "ArtieTune";
+    return "GrainMaker";
 }
 
 bool PluginProcessor::acceptsMidi() const
