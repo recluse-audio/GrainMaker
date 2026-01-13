@@ -16,7 +16,7 @@ TEST_CASE("Plugin instance name", "[name]")
 
   PluginProcessor testPlugin;
 
-  CHECK_THAT(testPlugin.getName().toStdString(), Catch::Matchers::Equals("ArtieTune"));
+  CHECK_THAT(testPlugin.getName().toStdString(), Catch::Matchers::Equals("GrainMaker"));
          
 }
 

@@ -5,7 +5,7 @@
             "name": "Launch and Debug Standalone App",
             "type": "lldb",
             "request": "launch",
-            "program": "${workspaceFolder}/build/ArtieTune_artefacts/Debug/Standalone/ArtieTune.app/Contents/MacOS/ArtieTune",
+            "program": "${workspaceFolder}/build/GrainMaker_artefacts/Debug/Standalone/GrainMaker.app/Contents/MacOS/GrainMaker",
             "args": [],
             "cwd": "${workspaceFolder}"
         },

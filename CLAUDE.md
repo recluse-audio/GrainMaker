@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-ArtieTune is a JUCE-based audio plugin implementing pitch detection (YIN algorithm) and pitch shifting using granular synthesis techniques (TD-PSOLA). The project builds as VST3, AU, AUv3, and Standalone formats.
+GrainMaker is a JUCE-based audio plugin implementing pitch detection (YIN algorithm) and pitch shifting using granular synthesis techniques (TD-PSOLA). The project builds as VST3, AU, AUv3, and Standalone formats.
 
 ## Build Commands
 
@@ -22,7 +22,7 @@ ArtieTune is a JUCE-based audio plugin implementing pitch detection (YIN algorit
 # Manual CMake build from BUILD directory
 cd BUILD
 cmake ..
-cmake --build . --target ArtieTune_VST3
+cmake --build . --target GrainMaker_VST3
 ```
 
 ### Testing
