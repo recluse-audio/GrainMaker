@@ -44,7 +44,8 @@ set(JUCE_COPY_PLUGIN_AFTER_BUILD ON)
 
 # JUCE is setup as a submodule in the /JUCE folder
 add_subdirectory(SUBMODULES/JUCE)
-
+# See juce cmake api. Call before 'add_subdirectory'
+set(JUCE_COPY_PLUGIN_AFTER_BUILD OFF)
 
 
 
@@ -60,7 +61,7 @@ juce_add_plugin("${PROJECT_NAME}"
     # NEEDS_MIDI_OUTPUT TRUE/FALSE              # Does the plugin need midi output?
     # IS_MIDI_EFFECT TRUE/FALSE                 # Is this plugin a MIDI effect?
     # EDITOR_WANTS_KEYBOARD_FOCUS TRUE/FALSE    # Does the editor need keyboard focus?
-    COPY_PLUGIN_AFTER_BUILD TRUE # On MacOS, plugin will be copied to /Users/you/Library/Audio/Plug-Ins/
+    COPY_PLUGIN_AFTER_BUILD FALSE # On MacOS, plugin will be copied to /Users/you/Library/Audio/Plug-Ins/
     PLUGIN_MANUFACTURER_CODE Recl               # This has to be one uppercase, rest lower for AU formats
     PLUGIN_CODE Recl                            # A unique four-character plugin id with at least one upper-case character
     FORMATS "${FORMATS}"

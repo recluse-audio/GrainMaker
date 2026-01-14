@@ -194,7 +194,7 @@ void GrainShifter::_applyWindowToFullGrain(juce::dsp::AudioBlock<float>& block)
 //=================
 float GrainShifter::_getWindowSampleAtIndexInPeriod(int indexInPeriod, float period)
 {
-
+	return 0.f; // TODO: this is a temp value
 }
 
 //=================
