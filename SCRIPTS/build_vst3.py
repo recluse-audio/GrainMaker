@@ -1,39 +1,44 @@
 #!/usr/bin/env python3
-import os
+"""
+Cross-platform CMake build script (macOS / Windows / Linux).
+
+Equivalent to:
+  pushd BUILD
+  cmake ..
+  cmake --build . --target GrainMaker_VST3
+  popd
+"""
+
+from __future__ import annotations
+
 import subprocess
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1] if (Path(__file__).parent.name.lower() in {"scripts", "script"}) else Path.cwd()
-BUILD_DIR = ROOT / "BUILD"
-TARGET = "GrainMaker_VST3"
-BUILD_TYPE = os.environ.get("CMAKE_BUILD_TYPE", "Debug")
 
-def run(cmd, cwd=None):
+def run(cmd: list[str], cwd: Path) -> None:
     print("+", " ".join(cmd))
-    subprocess.run(cmd, cwd=cwd, check=True)
+    subprocess.run(cmd, cwd=str(cwd), check=True)
 
-def is_multi_config_generator() -> bool:
-    gen = (os.environ.get("CMAKE_GENERATOR") or "").lower()
-    return ("visual studio" in gen) or ("xcode" in gen)
 
-def main():
-    BUILD_DIR.mkdir(exist_ok=True)
+def main() -> int:
+    build_dir = Path("BUILD").resolve()
+    if not build_dir.exists():
+        raise FileNotFoundError("BUILD directory does not exist")
 
-    # Your script does: cmake .. (no explicit build type)
-    # Here we still configure; for single-config we default to Debug unless you override CMAKE_BUILD_TYPE.
-    cfg_cmd = ["cmake", "-S", str(ROOT), "-B", str(BUILD_DIR)]
-    if not is_multi_config_generator():
-        cfg_cmd += [f"-DCMAKE_BUILD_TYPE={BUILD_TYPE}"]
-    run(cfg_cmd)
+    # Configure
+    run(["cmake", ".."], cwd=build_dir)
 
-    build_cmd = ["cmake", "--build", str(BUILD_DIR), "--target", TARGET]
-    if is_multi_config_generator():
-        build_cmd += ["--config", BUILD_TYPE]
-    run(build_cmd)
+    # Build target
+    build_cmd = ["cmake", "--build", ".", "--target", "GrainMaker_VST3"]
+
+    # Visual Studio / multi-config handling
+    if sys.platform.startswith("win"):
+        build_cmd += ["--config", "Debug"]  # change to Release if needed
+
+    run(build_cmd, cwd=build_dir)
+    return 0
+
 
 if __name__ == "__main__":
-    try:
-        main()
-    except subprocess.CalledProcessError as e:
-        sys.exit(e.returncode)
+    raise SystemExit(main())
