@@ -110,12 +110,12 @@ void PluginProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 		lookaheadBufferNumSamples = lookaheadBufferNumSamples * 4;
 
 	mLookaheadBuffer.clear();
-	mLookaheadBuffer.setSize(this->getNumOutputChannels(), lookaheadBufferNumSamples);
+	mLookaheadBuffer.setSize(getTotalNumOutputChannels(), lookaheadBufferNumSamples);
 
     mPitchDetector->prepareToPlay(sampleRate, lookaheadBufferNumSamples);
 
 	int lookaheadNumSamples = lookaheadBufferNumSamples - samplesPerBlock;
-    mCircularBuffer->setSize(this->getNumOutputChannels(), (int)sampleRate * 2); // by default 1 second
+    mCircularBuffer->setSize(getTotalNumOutputChannels(), static_cast<int>(sampleRate) * 2); // by default 1 second
     mCircularBuffer->setDelay(lookaheadNumSamples);
 
     mGranulator->prepare(sampleRate, samplesPerBlock, lookaheadBufferNumSamples);
@@ -156,8 +156,8 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     juce::ignoreUnused (midiMessages);
 
     juce::ScopedNoDenormals noDenormals;
-    auto totalNumInputChannels  = getTotalNumInputChannels();
-    auto totalNumOutputChannels = getTotalNumOutputChannels();
+    [[maybe_unused]] auto totalNumInputChannels  = getTotalNumInputChannels();
+    [[maybe_unused]] auto totalNumOutputChannels = getTotalNumOutputChannels();
 
     bool writeSuccess = mCircularBuffer->pushBuffer(buffer);
 	if(!writeSuccess)
@@ -222,7 +222,7 @@ juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 //
 const float PluginProcessor::getLastDetectedPitch()
 {
-    float pitch = this->getSampleRate() / mPitchDetector->getCurrentPeriod();
+    float pitch = static_cast<float>(this->getSampleRate() / mPitchDetector->getCurrentPeriod());
     return pitch;
 }
 

@@ -3,6 +3,12 @@
  * Created by Ryan Devens on 2025-10-13
  */
 
+// Suppress MSVC warning C4244 from std::make_unique<Window> template instantiation in <memory>
+#if defined(_MSC_VER)
+    #pragma warning(push)
+    #pragma warning(disable: 4244)
+#endif
+
 #include "Granulator.h"
 #include "../SUBMODULES/RD/SOURCE/BufferRange.h"
 #include "../SUBMODULES/RD/SOURCE/BufferHelper.h"
@@ -19,20 +25,24 @@ Granulator::~Granulator()
 
 }
 
+#if defined(_MSC_VER)
+    #pragma warning(pop)
+#endif
+
 //====================================
 void Granulator::prepare(double sampleRate, int blockSize, int lookaheadSize)
 {
-	// mProcessBlockSize = blockSize;
+	mProcessBlockSize = blockSize;
 
-	// mGrainBuffer1.clear();
-	// mGrainBuffer1.setSize(2, lookaheadSize);
-	// mGrainBuffer2.clear();
-	// mGrainBuffer2.setSize(2, lookaheadSize);
-	// mActiveGrainBuffer = 0;
-	// mNeedToFillActive = true;
+	mGrainBuffer1.clear();
+	mGrainBuffer1.setSize(2, lookaheadSize);
+	mGrainBuffer2.clear();
+	mGrainBuffer2.setSize(2, lookaheadSize);
+	mActiveGrainBuffer = 0;
+	mNeedToFillActive = true;
 
-	// mWindow->setSizeShapePeriod(sampleRate, Window::Shape::kHanning, blockSize); // period updated after pitch detection
-    // mWindow->setLooping(true);
+	mWindow->setSizeShapePeriod(static_cast<int>(sampleRate), Window::Shape::kHanning, blockSize); // period updated after pitch detection
+    mWindow->setLooping(true);
 }
 
 
@@ -91,12 +101,12 @@ void Granulator::_granulateToInactiveGrainBuffer(juce::AudioBuffer<float>& buffe
 void Granulator::_granulateToGrainBuffer(juce::AudioBuffer<float>& bufferToGranulate, juce::AudioBuffer<float>& grainBuffer, float detectedPeriod, float shiftedPeriod)
 {
 	grainBuffer.clear();
-	mWindow->setPeriod(detectedPeriod);
+	mWindow->setPeriod(static_cast<int>(detectedPeriod));
 
 	juce::int64 readStartIndex = 0;
-	juce::int64 readEndIndex = (juce::int64)detectedPeriod;
+	juce::int64 readEndIndex = static_cast<juce::int64>(detectedPeriod);
 	juce::int64 writeStartIndex = 0;
-	juce::int64 writeEndIndex = (juce::int64)detectedPeriod;
+	juce::int64 writeEndIndex = static_cast<juce::int64>(detectedPeriod);
 
 	while (readStartIndex < bufferToGranulate.getNumSamples() && writeStartIndex < grainBuffer.getNumSamples())
 	{
