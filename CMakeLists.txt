@@ -14,7 +14,7 @@ include(CMAKE/TESTS.cmake)
 set(FORMATS AU VST3 AUv3 Standalone)
 
 # Reads in VERSION file and sticks in it CURRENT_VERSION variable
-file(STRINGS VERSION CURRENT_VERSION)
+file(STRINGS VERSION.txt CURRENT_VERSION)
 
 # For simplicity, the name of the project is also the name of the target
 project(${PROJECT_NAME} VERSION ${CURRENT_VERSION})
