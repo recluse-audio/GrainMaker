@@ -37,7 +37,6 @@ public:
 	void granulate(juce::AudioBuffer<float>& lookaheadBuffer, juce::AudioBuffer<float>& processBlock,
 				float detectedPeriod, float shiftedPeriod);
 
-	Window& getWindow() { return *mWindow.get(); }
 private:
 	friend class GranulatorTester;
 	int mProcessBlockSize = 0;
