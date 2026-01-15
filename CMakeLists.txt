@@ -148,12 +148,17 @@ endif()
 set(VERSION_TXT "${CMAKE_SOURCE_DIR}/VERSION.txt")
 set(VERSION_HEADER "${CMAKE_SOURCE_DIR}/SOURCE/Util/Version.h")
 
-# Define a standalone pre-build step
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+
 add_custom_target(update_version_header
-	COMMAND ${CMAKE_COMMAND} -E echo "Updating version header..."
-	COMMAND ${CMAKE_SOURCE_DIR}/scripts/update_version.py ${VERSION_TXT} ${VERSION_HEADER}
-	COMMENT "Running update_version.py"
+    COMMAND ${CMAKE_COMMAND} -E echo "Updating version header..."
+    COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_SOURCE_DIR}/scripts/update_version.py
+            ${VERSION_TXT}
+            ${VERSION_HEADER}
+    COMMENT "Running update_version.py"
 )
+
 
 # Ensure it runs before building the plugin
 add_dependencies(${PROJECT_NAME} update_version_header)
