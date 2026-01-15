@@ -5,7 +5,19 @@
 
  #pragma once
 #include "Util/Juce_Header.h"
+
+// Suppress MSVC warning C4244 from Window.h and std::unique_ptr<Window> usage
+#if defined(_MSC_VER)
+    #pragma warning(push)
+    #pragma warning(disable: 4244)
+#endif
+
 #include "../SUBMODULES/RD/SOURCE/Window.h"
+
+#if defined(_MSC_VER)
+    #pragma warning(pop)
+#endif
+
 #include "../SUBMODULES/RD/SOURCE/BufferRange.h"
  /**
   * @brief This class is intended to perform the read/write operations 

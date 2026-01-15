@@ -75,6 +75,12 @@ juce_generate_juce_header("${PROJECT_NAME}")
 # C++20, please
 target_compile_features("${PROJECT_NAME}" PRIVATE cxx_std_20)
 
+# Disable specific MSVC warnings
+if(MSVC)
+    target_compile_options("${PROJECT_NAME}" PRIVATE
+        /wd4244  # Disable C4244: conversion warnings (especially from std library templates)
+    )
+endif()
 
 target_include_directories(${PROJECT_NAME} 
     PUBLIC
@@ -186,6 +192,13 @@ FetchContent_MakeAvailable(Catch2) # find_package equivalent
 # Setup the test executable, again C++ 20 please
 add_executable(Tests ${TESTS})
 target_compile_features(Tests PRIVATE cxx_std_20)
+
+# Disable specific MSVC warnings for Tests
+if(MSVC)
+    target_compile_options(Tests PRIVATE
+        /wd4244  # Disable C4244: conversion warnings (especially from std library templates)
+    )
+endif()
 
 target_sources(Tests PRIVATE ${TESTS})
 
