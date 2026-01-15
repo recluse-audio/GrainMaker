@@ -6,6 +6,7 @@
 #include <catch2/catch_approx.hpp>
 #include "../SOURCE/GRAIN/Granulator.h"
 #include "../SUBMODULES/RD/SOURCE/BufferFiller.h"
+#include "../SUBMODULES/RD/SOURCE/BufferHelper.h"
 #include "../SUBMODULES/RD/SOURCE/Window.h"
 #include "../SUBMODULES/RD/TESTS/TEST_UTILS/TestUtils.h"
 
@@ -39,7 +40,87 @@ public:
 	{
 		return granulator.mProcessBlockSize;
 	}
+
+	static Window& getWindow(Granulator& granulator) 
+	{ 
+		return *granulator.mWindow.get(); 
+	}
+
 };
+
+/**
+ * @brief Helper struct to encapsulate common test input parameters for Granulator
+ * Provides configurable mock processor input with sensible defaults
+ */
+struct MockProcessorInput
+{
+	// Configuration parameters
+	double testSampleRate;
+	int testBlockSize;
+	int testLookaheadSize;
+
+	// Audio buffers
+	juce::AudioBuffer<float> lookaheadBuffer;
+	juce::AudioBuffer<float> processBuffer;
+
+	// Period parameters
+	float detectedPeriod;
+	float shiftedPeriod;
+
+	/**
+	 * @brief Construct mock input with default values
+	 * @param sampleRate Sample rate for processing (default: 44100.0)
+	 * @param blockSize Process block size (default: 512)
+	 * @param lookaheadSize Lookahead buffer size (default: 2048)
+	 * @param period Detected period in samples (default: 128.0f)
+	 * @param shiftedPer Shifted period in samples (default: same as period)
+	 */
+	MockProcessorInput(
+		double sampleRate = 44100.0,
+		int blockSize = 512,
+		int lookaheadSize = 2048,
+		float period = 128.0f,
+		float shiftedPer = 128.0f
+	)
+		: testSampleRate(sampleRate)
+		, testBlockSize(blockSize)
+		, testLookaheadSize(lookaheadSize)
+		, lookaheadBuffer(2, lookaheadSize)
+		, processBuffer(2, blockSize)
+		, detectedPeriod(period)
+		, shiftedPeriod(shiftedPer)
+	{
+		lookaheadBuffer.clear();
+		processBuffer.clear();
+		BufferFiller::fillWithAllOnes(lookaheadBuffer);
+		BufferFiller::fillWithAllOnes(processBuffer);
+	}
+
+	/**
+	 * @brief Fill buffers with custom values
+	 */
+	void fillBuffers(float lookaheadValue, float processValue)
+	{
+		BufferFiller::fillWithValue(lookaheadBuffer, lookaheadValue);
+		BufferFiller::fillWithValue(processBuffer, processValue);
+	}
+
+	/**
+	 * @brief Clear both buffers
+	 */
+	void clearBuffers()
+	{
+		lookaheadBuffer.clear();
+		processBuffer.clear();
+	}
+};
+
+
+//==============================================================================
+//==============================================================================
+//=============================== prepare() ====================================
+//==============================================================================
+//==============================================================================
 
 TEST_CASE("Granulator prepare() initializes correctly", "[Granulator][prepare]")
 {
@@ -77,7 +158,7 @@ TEST_CASE("Granulator prepare() initializes correctly", "[Granulator][prepare]")
 
 	SECTION("Window is configured correctly")
 	{
-		Window& window = granulator.getWindow();
+		Window& window = GranulatorTester::getWindow(granulator);
 
 		// Check window is set to looping
 		CHECK(window.getIsLooping() == true);
@@ -98,3 +179,31 @@ TEST_CASE("Granulator prepare() initializes correctly", "[Granulator][prepare]")
 	}
 }
 
+//********************************************************************************************/
+
+
+//==============================================================================
+//==============================================================================
+//==============================================================================
+//==============================================================================
+//==============================================================================
+
+TEST_CASE("Granulator first call to granulate() flips mNeedToFillActive as expected", "[Granulator][granulate]")
+{
+	TestUtils::SetupAndTeardown setupAndTeardown;
+
+	Granulator granulator;
+	MockProcessorInput input;
+
+	// Call prepare
+	granulator.prepare(input.testSampleRate, input.testBlockSize, input.testLookaheadSize);
+
+	// Verify mNeedToFillActive is true before first granulate call
+	CHECK(GranulatorTester::getNeedToFillActive(granulator) == true);
+
+	// First call to granulate should flip mNeedToFillActive to false
+	granulator.granulate(input.lookaheadBuffer, input.processBuffer, input.detectedPeriod, input.shiftedPeriod);
+
+	// Verify mNeedToFillActive is now false after first granulate call
+	CHECK(GranulatorTester::getNeedToFillActive(granulator) == false);
+}
