@@ -5,7 +5,6 @@
 
  #pragma once
 #include "Util/Juce_Header.h"
-#include "GrainBuffer.h"
 #include "../SUBMODULES/RD/SOURCE/Window.h"
 #include "../SUBMODULES/RD/SOURCE/BufferRange.h"
  /**
@@ -17,28 +16,50 @@
  {
 public:
 	Granulator();
-	~Granulator() = default;
+	~Granulator();
 
+	void prepare(double sampleRate, int blockSize, int lookaheadSize);
 
-	/**
-	 * @brief Granulates an input buffer and writes to output buffer with specified grain and emission periods
-	 * As of 2025-10-21 I am deciding to make this use a "varispeed/tape speedup" technique as opposed to a "repeat grain" type granulating
-	 * This means when shifting up, if the buffer to granulate is not big enough you will end up with zeroes at the end of bufferToWriteTo
-	 * @param bufferToGranulate Source buffer to read grains from
-	 * @param bufferToWriteTo Output buffer to write granulated audio to
-	 * @param grainPeriod Size of each grain in samples
-	 * @param emissionPeriod Distance between grain start positions in output
-	 * @param window Window function to apply to grains
-	 * @return Normalized phase position (0.0-1.0) representing completion percentage of final grain written
-	 */
-	static float granulateBuffer(juce::AudioBuffer<float>& bufferToGranulate, juce::AudioBuffer<float>& bufferToWriteTo,
-		float grainPeriod, float emissionPeriod, Window& window, bool timePreserving = false);
+	juce::AudioBuffer<float>& getActiveGrainBuffer();
 
+	void granulate(juce::AudioBuffer<float>& lookaheadBuffer, juce::AudioBuffer<float>& processBlock,
+				float detectedPeriod, float shiftedPeriod);
 
-
-
+	Window& getWindow() { return *mWindow.get(); }
 private:
-	float mFinalGrainNormalizedPhase = 1.f;
-	// Window is no longer stored internally - passed by reference to granulateBuffer
+	friend class GranulatorTester;
+	int mProcessBlockSize = 0;
+	juce::AudioBuffer<float> mGrainBuffer1;
+	juce::AudioBuffer<float> mGrainBuffer2;
+	int mActiveGrainBuffer = 0;
+	int mGrainWritePos = 0;
+	int mGrainReadPos = 0;
+
+	bool mNeedToFillActive = true;
+
+	bool _shouldGranulateToActiveBuffer();
+	// if mGrainReadPos will extend past active grain buffer's size then we need to granulate to inactive buffer
+	bool _shouldGranulateToInactiveBuffer();
+
+	// This is expected after a prepareToPlay is called or a reset occurs
+	// normal operation we would write to inactive though.
+	void _granulateToActiveGrainBuffer(juce::AudioBuffer<float>& bufferToGranulate, float detectedPeriod, float shiftedPeriod);
+
+	void _granulateToInactiveGrainBuffer(juce::AudioBuffer<float>& bufferToGranulate, float detectedPeriod, float shiftedPeriod);
+
+	void _granulateToGrainBuffer(juce::AudioBuffer<float>& bufferToGranulate, juce::AudioBuffer<float>& grainBuffer, float detectedPeriod, float shiftedPeriod);
+
+	//
+	void _writeFromGrainBufferToProcessBlock(juce::AudioBuffer<float>& processBlock);
+
+	// This happens when mGrainReadPos surpasses mGrainBuffer size.
+	// need to check per-sample so we know when to switch from one to the next. T
+	void _switchActiveBuffer();
+
+	juce::AudioBuffer<float>& _getActiveGrainBuffer();
+	juce::AudioBuffer<float>& _getInactiveGrainBuffer();
+	
+	std::unique_ptr<Window> mWindow;
+
 
  };

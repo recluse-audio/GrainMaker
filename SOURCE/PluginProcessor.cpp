@@ -13,8 +13,8 @@ PluginProcessor::PluginProcessor()
     mPitchDetector = std::make_unique<PitchDetector>();
     mCircularBuffer = std::make_unique<CircularBuffer>();
 	mGranulator = std::make_unique<Granulator>();
-	mWindow = std::make_unique<Window>();
-	mWindow->setLooping(true);
+	// mWindow = std::make_unique<Window>();
+	// mWindow->setLooping(true);
 
 
 	mShiftRatio = 1.f;
@@ -30,7 +30,7 @@ PluginProcessor::~PluginProcessor()
 	mCircularBuffer.reset();
     mPitchDetector.reset();
     mGranulator.reset();
-	mWindow.reset();
+	//mWindow.reset();
 }
 
 //==============================================================================
@@ -118,7 +118,7 @@ void PluginProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
     mCircularBuffer->setSize(this->getNumOutputChannels(), (int)sampleRate * 2); // by default 1 second
     mCircularBuffer->setDelay(lookaheadNumSamples);
 
-	mWindow->setSizeShapePeriod(sampleRate, Window::Shape::kHanning, samplesPerBlock); // period updated after pitch detection
+    mGranulator->prepare(sampleRate, samplesPerBlock, lookaheadBufferNumSamples);
 
 }
 
@@ -164,7 +164,7 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 		return;
 
 	buffer.clear();
-	mLookaheadBuffer.clear();
+    mLookaheadBuffer.clear();
     mCircularBuffer->popBufferWithLookahead(mLookaheadBuffer, buffer);
 
 
@@ -175,8 +175,10 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 		
 	float periodAfterShifting = detected_period / mShiftRatio;
 
-	// window period set in this function. Need to pass detected_period anyways
-	mGranulator->granulateBuffer(mLookaheadBuffer, buffer, detected_period, periodAfterShifting, *mWindow.get(), false);
+    mGranulator->granulate(mLookaheadBuffer, buffer, detected_period, periodAfterShifting);
+
+	// // window period set in this function. Need to pass detected_period anyways
+	// mGranulator->granulateBuffer(mLookaheadBuffer, buffer, detected_period, periodAfterShifting, *mWindow.get(), true);
 
 }
 

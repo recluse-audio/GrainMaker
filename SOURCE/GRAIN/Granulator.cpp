@@ -9,113 +9,201 @@
 
 Granulator::Granulator()
 {
-	// No longer initialize Window here - it will be passed by reference
+	mWindow = std::make_unique<Window>();
+	//mWindow->setLooping(true);
 }
 
-float Granulator::granulateBuffer(juce::AudioBuffer<float>& bufferToGranulate, juce::AudioBuffer<float>& bufferToWriteTo, 
-									float grainPeriod, float emissionPeriod, Window& window, bool timePreserving)
+Granulator::~Granulator()
 {
-	window.setPeriod(grainPeriod);
-	window.setLooping(true);
-	//window.setCurrentReadPosWithNormalizedPhase(mFinalGrainNormalizedPhase);
+	mWindow.reset();
 
-	// Clear output buffer first
-	bufferToWriteTo.clear();
+}
 
-	const int sourceNumSamples = bufferToGranulate.getNumSamples();
-	const int outputNumSamples = bufferToWriteTo.getNumSamples();
+//====================================
+void Granulator::prepare(double sampleRate, int blockSize, int lookaheadSize)
+{
+	// mProcessBlockSize = blockSize;
 
+	// mGrainBuffer1.clear();
+	// mGrainBuffer1.setSize(2, lookaheadSize);
+	// mGrainBuffer2.clear();
+	// mGrainBuffer2.setSize(2, lookaheadSize);
+	// mActiveGrainBuffer = 0;
+	// mNeedToFillActive = true;
 
-
-	// Assert that source buffer is at least big enough for one whole grain
-	jassert(sourceNumSamples >= grainPeriod);
-
-	// Early return if source buffer is too small
-	if (sourceNumSamples < grainPeriod)
-		return 0.0f;
-
-	// Track positions in source and output buffers
-	int readPos = 0;
-	int writePos = 0;
+	// mWindow->setSizeShapePeriod(sampleRate, Window::Shape::kHanning, blockSize); // period updated after pitch detection
+    // mWindow->setLooping(true);
+}
 
 
-	// Process grains until we run out of output space
-	while (readPos < sourceNumSamples)
-	{ 
-		// These can be modified if handling a partial grain that starts midway through grain phase
-		int grainSize = static_cast<int>(grainPeriod);
-		int emissionStep = static_cast<int>(emissionPeriod);
+//=======================================
+void Granulator::granulate(juce::AudioBuffer<float>& lookaheadBuffer, juce::AudioBuffer<float>& processBlock,
+							float detectedPeriod, float shiftedPeriod)
+{
+	if(_shouldGranulateToActiveBuffer())
+	{
+		_granulateToActiveGrainBuffer(lookaheadBuffer, detectedPeriod, shiftedPeriod);
+		mNeedToFillActive = false; 
+	}
+	else if(_shouldGranulateToInactiveBuffer())
+	{
+		_granulateToInactiveGrainBuffer(lookaheadBuffer, detectedPeriod, shiftedPeriod);
+	}
+		
+	_writeFromGrainBufferToProcessBlock(processBlock);
+}
 
-		// first grain might be partial
-		if(readPos = 0)
-		{
-			// if previous grain was 55% complete it would write 45% in this block
-			float percentOfGrainSpillover = 1.f - window.getCurrentNormalizedPhase();
-			grainSize = (int)(grainPeriod * percentOfGrainSpillover);
-			
-			// use full grain size
-			// add Emission step as if starting from start of prev blocks final grain
-			// 
-			float percentOfGrainFromPrevBlock = window.getCurrentNormalizedPhase();
-			int prevPartialGrainNumSamples = (int)(grainSize * percentOfGrainFromPrevBlock);
-			emissionStep = (int)(emissionStep - prevPartialGrainNumSamples);
-		}
+//=======================================
+bool Granulator::_shouldGranulateToActiveBuffer()
+{
+	return mNeedToFillActive;
+}
 
-		// Calculate grain read range
-		int readEndPos = readPos + grainSize - 1;
-		if (readEndPos >= sourceNumSamples)
-			readEndPos = sourceNumSamples - 1;
-		RD::BufferRange readRange(readPos, readEndPos);
+//=======================================
+bool Granulator::_shouldGranulateToInactiveBuffer()
+{
+	bool shouldGranulate = false;
+	// we are about to read beyond the end of the active grain buffer
+	// in this processBlock, so granulate the next one and be ready to switch.
+	if(mGrainReadPos + mProcessBlockSize >= mGrainBuffer1.getNumSamples())
+	{
+		shouldGranulate = true;
+	}
 
-		// Calculate grain write range
-		int writeEndPos = writePos + grainSize - 1;
+	return shouldGranulate;
+}
 
-		// Check if this grain would extend past the output buffer
-		if (writeEndPos >= outputNumSamples)
-		{
-			// This is the final grain that extends past the buffer
-			writeEndPos = outputNumSamples - 1;
 
-			// // Calculate how much of this grain we actually wrote
-			// int samplesWritten = writeEndPos - writePos + 1;
+//=======================================
+void Granulator::_granulateToActiveGrainBuffer(juce::AudioBuffer<float>& bufferToGranulate, float detectedPeriod, float shiftedPeriod)
+{
+	_granulateToGrainBuffer(bufferToGranulate, _getActiveGrainBuffer(), detectedPeriod, shiftedPeriod);
+}
 
-			// // Calculate the normalized phase position (0.0 to 1.0)
-			// finalGrainPhase = static_cast<float>(samplesWritten) / grainPeriod;
-		}
+//=======================================
+void Granulator::_granulateToInactiveGrainBuffer(juce::AudioBuffer<float>& bufferToGranulate, float detectedPeriod, float shiftedPeriod)
+{
+	_granulateToGrainBuffer(bufferToGranulate, _getInactiveGrainBuffer(), detectedPeriod, shiftedPeriod);
 
-		RD::BufferRange writeRange(writePos, writeEndPos);
+}
+
+//=======================================
+void Granulator::_granulateToGrainBuffer(juce::AudioBuffer<float>& bufferToGranulate, juce::AudioBuffer<float>& grainBuffer, float detectedPeriod, float shiftedPeriod)
+{
+	grainBuffer.clear();
+	mWindow->setPeriod(detectedPeriod);
+
+	juce::int64 readStartIndex = 0;
+	juce::int64 readEndIndex = (juce::int64)detectedPeriod;
+	juce::int64 writeStartIndex = 0;
+	juce::int64 writeEndIndex = (juce::int64)detectedPeriod;
+
+	while (readStartIndex < bufferToGranulate.getNumSamples() && writeStartIndex < grainBuffer.getNumSamples())
+	{
+		RD::BufferRange readRange; readRange.setStartIndex(readStartIndex); readRange.setEndIndex(readEndIndex);
+		RD::BufferRange writeRange; writeRange.setStartIndex(writeStartIndex); writeRange.setEndIndex(writeEndIndex);
 
 		// Get the grain as an audio block from the source buffer
 		juce::dsp::AudioBlock<float> grainBlock = BufferHelper::getRangeAsBlock(bufferToGranulate, readRange);
 
 		// Applies window as you might guess
-		BufferHelper::applyWindowToBlock(grainBlock, window);
+		BufferHelper::applyWindowToBlock(grainBlock, *mWindow.get());
 
 		// Write the grain block to the output buffer
-		BufferHelper::writeBlockToBuffer(bufferToWriteTo, grainBlock, writeRange);
+		BufferHelper::writeBlockToBuffer(_getActiveGrainBuffer(), grainBlock, writeRange);
 
-		// Update positions
-		writePos += emissionStep;
+		readStartIndex =  readStartIndex + (juce::int64) detectedPeriod;
+		readEndIndex = readStartIndex + (juce::int64) detectedPeriod;
+		if(readEndIndex >= bufferToGranulate.getNumSamples())
+			readEndIndex = bufferToGranulate.getNumSamples() - 1;
 
-		if(timePreserving) // time preserving repeats grains as needed
+		writeStartIndex = writeStartIndex + (juce::int64) shiftedPeriod;
+		writeEndIndex = writeStartIndex + (juce::int64) detectedPeriod;
+		if(writeEndIndex >= grainBuffer.getNumSamples())
+			writeEndIndex = grainBuffer.getNumSamples() - 1;
+	}
+}
+
+
+
+//=======================================
+void Granulator::_writeFromGrainBufferToProcessBlock(juce::AudioBuffer<float>& processBlock)
+{
+	for(int sampleIndex = 0; sampleIndex < processBlock.getNumSamples(); sampleIndex++)
+	{
+		for(int ch = 0; ch < processBlock.getNumChannels(); ch++)
 		{
-			// The emission of the next grain start aka writePos will occur before the completion of 
-			// the read range, so next grain will also use this same readRange
-			// if writePos is at or after the end of the readRange then increment
-			if(writePos >= (readPos + grainSize))
-			{
-				readPos += grainSize;
-			}
+			float grainSample = _getActiveGrainBuffer().getSample(ch, mGrainReadPos);
+			processBlock.setSample(ch, sampleIndex, grainSample);
 		}
-		else // varispeed aka tape speed up style
-		{
-			readPos += grainSize;
-		}
+		mGrainReadPos++;
 
-		// Stop if the next write position would be beyond the output buffer
-		if (writePos >= outputNumSamples)
-			break;
+		// switching of active grain buffers happens here in sample loop (not channel loop though)
+		if(mGrainReadPos >= mGrainBuffer1.getNumSamples())
+		{
+			mGrainReadPos = mGrainReadPos - mGrainBuffer1.getNumSamples(); // wrap read pos, both grain buffers are same size
+			_switchActiveBuffer();
+		}
 	}
 
-	return 0.f;
 }
+
+//=======================================
+void Granulator::_switchActiveBuffer()
+{
+	if(mActiveGrainBuffer == 0)
+		mActiveGrainBuffer = 1;
+	else if(mActiveGrainBuffer == 1)
+		mActiveGrainBuffer = 0;
+}
+
+//=======================================
+juce::AudioBuffer<float>& Granulator::_getActiveGrainBuffer()
+{
+	if(mActiveGrainBuffer == 0)
+		return mGrainBuffer1;
+	else
+		return mGrainBuffer2;
+}
+
+//=======================================
+juce::AudioBuffer<float>& Granulator::_getInactiveGrainBuffer()
+{
+	if(mActiveGrainBuffer == 0)
+		return mGrainBuffer2;
+	else
+		return mGrainBuffer1;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -10,7 +10,9 @@ def generate_files_list(root_folders, output_file, variable_name):
         for folder, subfolders, files in os.walk(root_folder):
             for filename in files:
                 if filename.endswith('.cpp') or filename.endswith('.h'):
-                    files_list.append(os.path.join(folder, filename))
+                    # Use forward slashes for CMake cross-platform compatibility
+                    file_path = os.path.join(folder, filename).replace('\\', '/')
+                    files_list.append(file_path)
     files_list.sort()
     files_list = "\n    ".join(files_list)
     output = 'set({}\n    {}\n)'.format(variable_name, files_list)
