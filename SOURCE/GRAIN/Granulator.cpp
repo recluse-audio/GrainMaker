@@ -60,6 +60,13 @@ void Granulator::granulate(juce::AudioBuffer<float>& lookaheadBuffer, juce::Audi
 		_granulateToInactiveGrainBuffer(lookaheadBuffer, detectedPeriod, shiftedPeriod);
 	}
 		
+	// switching of active grain buffers happens here in sample loop (not channel loop though)
+	if(mGrainReadPos >= mGrainBuffer1.getNumSamples())
+	{
+		mGrainReadPos = mGrainReadPos - mGrainBuffer1.getNumSamples(); // wrap read pos, both grain buffers are same size
+		_switchActiveBuffer();
+	}
+
 	_writeFromGrainBufferToProcessBlock(processBlock);
 
 	bool test = false;
@@ -85,7 +92,7 @@ bool Granulator::_shouldGranulateToInactiveBuffer()
 
 	// we are about to read beyond the end of the active grain buffer
 	// in this processBlock, so granulate the next one and be ready to switch.
-	if(finalGrainReadPosThisBlock >= mGrainBuffer1.getNumSamples())
+	if(finalGrainReadPosThisBlock >= mGrainBuffer1.getNumSamples() || mGrainReadPos == 0)
 	{
 		shouldGranulate = true;
 	}
@@ -159,13 +166,6 @@ void Granulator::_writeFromGrainBufferToProcessBlock(juce::AudioBuffer<float>& p
 			processBlock.setSample(ch, sampleIndex, grainSample);
 		}
 		mGrainReadPos++;
-
-		// switching of active grain buffers happens here in sample loop (not channel loop though)
-		if(mGrainReadPos >= mGrainBuffer1.getNumSamples())
-		{
-			mGrainReadPos = mGrainReadPos - mGrainBuffer1.getNumSamples(); // wrap read pos, both grain buffers are same size
-			_switchActiveBuffer();
-		}
 	}
 
 }
