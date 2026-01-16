@@ -43,8 +43,9 @@ private:
 	juce::AudioBuffer<float> mGrainBuffer1;
 	juce::AudioBuffer<float> mGrainBuffer2;
 	int mActiveGrainBuffer = 0;
-	int mGrainWritePos = 0;
+	// pos to read from grainBuffer and to write in processBlock
 	int mGrainReadPos = 0;
+	int mProcessBlockWritePos = 0;
 
 	bool mNeedToFillActive = true;
 
