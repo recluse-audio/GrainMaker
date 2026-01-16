@@ -40,7 +40,7 @@ void Granulator::prepare(double sampleRate, int blockSize, int lookaheadSize)
 	mGrainBuffer2.setSize(2, lookaheadSize);
 	mActiveGrainBuffer = 0;
 	mNeedToFillActive = true;
-
+	mGrainReadPos = 0;
 	mWindow->setSizeShapePeriod(static_cast<int>(sampleRate), Window::Shape::kHanning, blockSize); // period updated after pitch detection
     mWindow->setLooping(true);
 }
@@ -73,9 +73,17 @@ bool Granulator::_shouldGranulateToActiveBuffer()
 bool Granulator::_shouldGranulateToInactiveBuffer()
 {
 	bool shouldGranulate = false;
+
+	// this function determines if we will run out of grain data in the current block
+	// block size of 256 samples will span from 0-255.
+	// So if we are starting at index 768 in grainBuffer and block size is 256,
+	// we won't granulate inactive buffer until next block. 
+	// b/c we have all the grain data needed to finish out current process block with active grain
+	int finalGrainReadPosThisBlock = mGrainReadPos + mProcessBlockSize - 1;
+
 	// we are about to read beyond the end of the active grain buffer
 	// in this processBlock, so granulate the next one and be ready to switch.
-	if(mGrainReadPos + mProcessBlockSize >= mGrainBuffer1.getNumSamples())
+	if(finalGrainReadPosThisBlock >= mGrainBuffer1.getNumSamples())
 	{
 		shouldGranulate = true;
 	}
@@ -120,7 +128,7 @@ void Granulator::_granulateToGrainBuffer(juce::AudioBuffer<float>& bufferToGranu
 		BufferHelper::applyWindowToBlock(grainBlock, *mWindow.get());
 
 		// Write the grain block to the output buffer
-		BufferHelper::writeBlockToBuffer(_getActiveGrainBuffer(), grainBlock, writeRange);
+		BufferHelper::writeBlockToBuffer(grainBuffer, grainBlock, writeRange);
 
 		readStartIndex =  readEndIndex + (juce::int64) 1;
 		readEndIndex = readStartIndex + (juce::int64) (detectedPeriod - 1.f);
@@ -131,6 +139,8 @@ void Granulator::_granulateToGrainBuffer(juce::AudioBuffer<float>& bufferToGranu
 		writeEndIndex = writeStartIndex + (juce::int64) (detectedPeriod - 1.f);
 		if(writeEndIndex >= grainBuffer.getNumSamples())
 			writeEndIndex = grainBuffer.getNumSamples() - 1;
+
+
 	}
 }
 
