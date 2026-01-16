@@ -76,9 +76,9 @@ struct MockProcessorInput
 	 * @param shiftedPer Shifted period in samples (default: same as period)
 	 */
 	MockProcessorInput(
-		double sampleRate = 44100.0,
-		int blockSize = 512,
-		int lookaheadSize = 2048,
+		double sampleRate = 48000.0,
+		int blockSize = 256,
+		int lookaheadSize = 1024,
 		float period = 128.0f,
 		float shiftedPer = 128.0f
 	)
@@ -128,9 +128,9 @@ TEST_CASE("Granulator prepare() initializes correctly", "[Granulator][prepare]")
 
 	Granulator granulator;
 
-	const double testSampleRate = 44100.0;
-	const int testBlockSize = 512;
-	const int testLookaheadSize = 2048;
+	const double testSampleRate = 48000.0;
+	const int testBlockSize = 256;
+	const int testLookaheadSize = 1024;
 
 	// Call prepare
 	granulator.prepare(testSampleRate, testBlockSize, testLookaheadSize);
@@ -206,4 +206,44 @@ TEST_CASE("Granulator first call to granulate() flips mNeedToFillActive as expec
 
 	// Verify mNeedToFillActive is now false after first granulate call
 	CHECK(GranulatorTester::getNeedToFillActive(granulator) == false);
+
+	// Call prepare again
+	granulator.prepare(input.testSampleRate, input.testBlockSize, input.testLookaheadSize);
+
+	// Verify mNeedToFillActive is true before first granulate call
+	CHECK(GranulatorTester::getNeedToFillActive(granulator) == true);
+}
+
+
+//********************************************************************************************/
+
+
+//==============================================================================
+//==============================================================================
+//==============================================================================
+//==============================================================================
+//==============================================================================
+TEST_CASE("Granulator fills GrainBuffers appropriately", "[Granulator][grainBuffer]")
+{
+	TestUtils::SetupAndTeardown setupAndTeardown;
+
+	Granulator granulator;
+	MockProcessorInput input;
+
+	Window& window = GranulatorTester::getWindow(granulator);
+	window.setShape(Window::Shape::kNone);
+
+	// Call prepare
+	granulator.prepare(input.testSampleRate, input.testBlockSize, input.testLookaheadSize);
+
+	CHECK(BufferHelper::isSilent(GranulatorTester::getGrainBuffer1(granulator)) == true);
+	CHECK(BufferHelper::isSilent(GranulatorTester::getGrainBuffer2(granulator)) == true);
+
+	// granulate one processBuffer, 
+	// grainBuffer1 is filled with entire input.lookaheadBuffer
+	// grainBuffer2 is still all 0's
+	granulator.granulate(input.lookaheadBuffer, input.processBuffer, input.detectedPeriod, input.shiftedPeriod);
+	CHECK(BufferHelper::buffersAreIdentical(GranulatorTester::getGrainBuffer1(granulator), input.lookaheadBuffer)); 
+	CHECK(BufferHelper::isSilent(GranulatorTester::getGrainBuffer2(granulator)) == true);
+
 }

@@ -13,7 +13,7 @@
             "name": "Launch and Debug Catch2 Tests",
             "type": "lldb",
             "request": "launch",
-            "program": "${workspaceFolder}/BUILD/Tests",
+            "program": "${workspaceFolder}/BUILD/Debug/Tests",
             "args": ["--break"],
             "cwd": "${workspaceFolder}",
             //"preLaunchTask": "Build and Run Catch2 Tests"
