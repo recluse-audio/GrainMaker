@@ -332,6 +332,180 @@ TEST_CASE("Read/write pos related to lookahead/grainBuffers/processBlock all add
 		}
 	}
 }
+//********************************************************************************************/
 
 
+//==============================================================================
+//==============================================================================
+//==============================================================================
+//==============================================================================
+//==============================================================================
+TEST_CASE("mGrainReadPos is incremented properly when writing to processBlock()", "[Granulator][grainBuffer]")
+{
+	TestUtils::SetupAndTeardown setupAndTeardown;
+
+	Granulator granulator;
+	MockProcessorInput input;
+
+	juce::AudioBuffer<float>& grainBuffer1 = GranulatorTester::getGrainBuffer1(granulator);
+	juce::AudioBuffer<float>& lookaheadBuffer = input.lookaheadBuffer;
+	lookaheadBuffer.clear();
+	BufferFiller::fillIncremental(lookaheadBuffer);
+
+	// Call prepare
+	// Only want to test that all 1's buffer's are read from lookahead to grainBuffer in this test.
+	// Need to remove windowing for high contrast. Window shape is set in prepare() by default.
+	granulator.prepare(input.testSampleRate, input.testBlockSize, input.testLookaheadSize);
+	Window& window = GranulatorTester::getWindow(granulator);
+	window.setShape(Window::Shape::kNone);
+
+	// Call private function in Granulator
+	granulator.granulate(input.lookaheadBuffer, input.processBuffer, input.detectedPeriod, input.shiftedPeriod);
+
+	int numSamples  = input.processBuffer.getNumSamples();
+	int numChannels = input.processBuffer.getNumChannels();
+
+	// make sure incremental lookaheadBuffer data made it to processBuffer
+	for (int sampleIndex = 0; sampleIndex < numSamples; ++sampleIndex)
+	{
+		for (int ch = 0; ch < numChannels; ++ch)
+		{
+			float processBufferSample = input.processBuffer.getSample(ch, sampleIndex);
+			CHECK(processBufferSample == (float)sampleIndex);
+		}
+	}
+
+	// at this point, we've should have taken 256 samples (process block size) of grainBuffer1 data [0-255]
+	// and written it to sample indices [0-255] of the processBuffer
+	CHECK(input.processBuffer.getNumSamples() == 256);
+	CHECK(GranulatorTester::getGrainReadPos(granulator) == 255);
+}
+//********************************************************************************************/
+
+
+//==============================================================================
+//==============================================================================
+//==============================================================================
+//==============================================================================
+//==============================================================================
+TEST_CASE("Testing '_granulateToGrainBuffer()' - how grainBuffers are filled from lookaheadBuffer", "[Granulator][grainBuffer]")
+{
+	TestUtils::SetupAndTeardown setupAndTeardown;
+	Granulator granulator;
+	MockProcessorInput input;
+
+	// Fill lookaheadBuffer with grains who's sample values correspond with their grain number
+	// grain 1: [0-127] -> set to 1.f
+	// grain 2: [128-255] -> set to 2.f
+	// grain 3: [256-383] -> set to 3.f etc
+	// grain 4: [384-511]
+	// grain 5: [512-639]
+	// grain 6: [640-767]
+	// grain 7: [768-895]
+	// grain 8: [896-1023] 
+	juce::AudioBuffer<float>& lookaheadBuffer = input.lookaheadBuffer;
+	lookaheadBuffer.clear();
+	BufferFiller::fillRangeWithValue(lookaheadBuffer, 0, 127, 1.f);
+	BufferFiller::fillRangeWithValue(lookaheadBuffer, 128, 255, 2.f);
+	BufferFiller::fillRangeWithValue(lookaheadBuffer, 256, 383, 3.f);
+	BufferFiller::fillRangeWithValue(lookaheadBuffer, 384, 511, 4.f);
+	BufferFiller::fillRangeWithValue(lookaheadBuffer, 512, 639, 5.f);
+	BufferFiller::fillRangeWithValue(lookaheadBuffer, 640, 767, 6.f);
+	BufferFiller::fillRangeWithValue(lookaheadBuffer, 768, 895, 7.f);
+	BufferFiller::fillRangeWithValue(lookaheadBuffer, 896, 1023, 8.f);
+
+
+	granulator.prepare(input.testSampleRate, input.testBlockSize, input.testLookaheadSize);
+	Window& window = GranulatorTester::getWindow(granulator);
+	window.setShape(Window::Shape::kNone);
+
+	juce::AudioBuffer<float>& grainBuffer1 = GranulatorTester::getGrainBuffer1(granulator);
+	// Call private function in Granulator
+	GranulatorTester::granulateToGrainBuffer(granulator, input.lookaheadBuffer, 
+											grainBuffer1,
+											input.detectedPeriod, input.shiftedPeriod);
+
+	int numSamples  = grainBuffer1.getNumSamples();
+	int numChannels = grainBuffer1.getNumChannels();
+
+	// GRAIN 1: [0-127] -> 1.f
+	for (int sampleIndex = 0; sampleIndex <= 127; ++sampleIndex)
+	{
+		for (int ch = 0; ch < numChannels; ++ch)
+		{
+			float grainSample = grainBuffer1.getSample(ch, sampleIndex);
+			CHECK(grainSample == 1.f);
+		}
+	}
+
+	// GRAIN 2: [128-255] -> 2.f
+	for (int sampleIndex = 128; sampleIndex <= 255; ++sampleIndex)
+	{
+		for (int ch = 0; ch < numChannels; ++ch)
+		{
+			float grainSample = grainBuffer1.getSample(ch, sampleIndex);
+			CHECK(grainSample == 2.f);
+		}
+	}
+
+	// GRAIN 3: [256-383] -> 3.f
+	for (int sampleIndex = 256; sampleIndex <= 383; ++sampleIndex)
+	{
+		for (int ch = 0; ch < numChannels; ++ch)
+		{
+			float grainSample = grainBuffer1.getSample(ch, sampleIndex);
+			CHECK(grainSample == 3.f);
+		}
+	}
+
+	// GRAIN 4: [384-511] -> 4.f
+	for (int sampleIndex = 384; sampleIndex <= 511; ++sampleIndex)
+	{
+		for (int ch = 0; ch < numChannels; ++ch)
+		{
+			float grainSample = grainBuffer1.getSample(ch, sampleIndex);
+			CHECK(grainSample == 4.f);
+		}
+	}
+
+	// GRAIN 5: [512-639] -> 5.f
+	for (int sampleIndex = 512; sampleIndex <= 639; ++sampleIndex)
+	{
+		for (int ch = 0; ch < numChannels; ++ch)
+		{
+			float grainSample = grainBuffer1.getSample(ch, sampleIndex);
+			CHECK(grainSample == 5.f);
+		}
+	}
+
+	// GRAIN 6: [640-767] -> 6.f
+	for (int sampleIndex = 640; sampleIndex <= 767; ++sampleIndex)
+	{
+		for (int ch = 0; ch < numChannels; ++ch)
+		{
+			float grainSample = grainBuffer1.getSample(ch, sampleIndex);
+			CHECK(grainSample == 6.f);
+		}
+	}
+
+	// GRAIN 7: [768-895] -> 7.f
+	for (int sampleIndex = 768; sampleIndex <= 895; ++sampleIndex)
+	{
+		for (int ch = 0; ch < numChannels; ++ch)
+		{
+			float grainSample = grainBuffer1.getSample(ch, sampleIndex);
+			CHECK(grainSample == 7.f);
+		}
+	}
+
+	// GRAIN 8: [896-1023] -> 8.f
+	for (int sampleIndex = 896; sampleIndex <= 1023; ++sampleIndex)
+	{
+		for (int ch = 0; ch < numChannels; ++ch)
+		{
+			float grainSample = grainBuffer1.getSample(ch, sampleIndex);
+			CHECK(grainSample == 8.f);
+		}
+	}
+}
 

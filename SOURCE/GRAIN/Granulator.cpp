@@ -61,6 +61,8 @@ void Granulator::granulate(juce::AudioBuffer<float>& lookaheadBuffer, juce::Audi
 	}
 		
 	_writeFromGrainBufferToProcessBlock(processBlock);
+
+	bool test = false;
 }
 
 //=======================================
