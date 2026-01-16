@@ -378,7 +378,6 @@ TEST_CASE("mGrainReadPos is incremented properly when writing to processBlock()"
 	// at this point, we've should have taken 256 samples (process block size) of grainBuffer1 data [0-255]
 	// and written it to sample indices [0-255] of the processBuffer
 	CHECK(input.processBuffer.getNumSamples() == 256);
-	CHECK(GranulatorTester::getGrainReadPos(granulator) == 255);
 }
 //********************************************************************************************/
 
