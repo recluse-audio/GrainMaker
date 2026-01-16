@@ -19,6 +19,15 @@
             //"preLaunchTask": "Build and Run Catch2 Tests"
         },
         {
+            "name": "Launch and Debug [Granulator] Catch2 Tests",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/BUILD/Debug/Tests",
+            "args": ["[Granulator]", "--break"],
+            "cwd": "${workspaceFolder}",
+            //"preLaunchTask": "Build and Run Catch2 Tests"
+        },
+        {
             "name": "Attach to Process",
             "type": "lldb",
             "request": "attach",

@@ -104,9 +104,9 @@ void Granulator::_granulateToGrainBuffer(juce::AudioBuffer<float>& bufferToGranu
 	mWindow->setPeriod(static_cast<int>(detectedPeriod));
 
 	juce::int64 readStartIndex = 0;
-	juce::int64 readEndIndex = static_cast<juce::int64>(detectedPeriod);
+	juce::int64 readEndIndex = static_cast<juce::int64>(detectedPeriod - 1.f);
 	juce::int64 writeStartIndex = 0;
-	juce::int64 writeEndIndex = static_cast<juce::int64>(detectedPeriod);
+	juce::int64 writeEndIndex = static_cast<juce::int64>(detectedPeriod - 1.f);
 
 	while (readStartIndex < bufferToGranulate.getNumSamples() && writeStartIndex < grainBuffer.getNumSamples())
 	{
@@ -122,13 +122,13 @@ void Granulator::_granulateToGrainBuffer(juce::AudioBuffer<float>& bufferToGranu
 		// Write the grain block to the output buffer
 		BufferHelper::writeBlockToBuffer(_getActiveGrainBuffer(), grainBlock, writeRange);
 
-		readStartIndex =  readStartIndex + (juce::int64) detectedPeriod;
-		readEndIndex = readStartIndex + (juce::int64) detectedPeriod;
+		readStartIndex =  readEndIndex + (juce::int64) 1;
+		readEndIndex = readStartIndex + (juce::int64) (detectedPeriod - 1.f);
 		if(readEndIndex >= bufferToGranulate.getNumSamples())
 			readEndIndex = bufferToGranulate.getNumSamples() - 1;
 
-		writeStartIndex = writeStartIndex + (juce::int64) shiftedPeriod;
-		writeEndIndex = writeStartIndex + (juce::int64) detectedPeriod;
+		writeStartIndex = writeStartIndex + (juce::int64) (shiftedPeriod);
+		writeEndIndex = writeStartIndex + (juce::int64) (detectedPeriod - 1.f);
 		if(writeEndIndex >= grainBuffer.getNumSamples())
 			writeEndIndex = grainBuffer.getNumSamples() - 1;
 	}

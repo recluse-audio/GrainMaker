@@ -230,11 +230,29 @@ TEST_CASE("Granulator fills GrainBuffers appropriately", "[Granulator][grainBuff
 	Granulator granulator;
 	MockProcessorInput input;
 
-	Window& window = GranulatorTester::getWindow(granulator);
-	window.setShape(Window::Shape::kNone);
+	int numChannels = input.lookaheadBuffer.getNumChannels();
+	int numSamples = input.lookaheadBuffer.getNumSamples();
+
+
 
 	// Call prepare
 	granulator.prepare(input.testSampleRate, input.testBlockSize, input.testLookaheadSize);
+	for(int sampleIndex = 0; sampleIndex < numSamples; sampleIndex++)
+	{
+		for(int ch = 0; ch < numChannels; ch++)
+		{
+
+			float lookaheadSample = input.lookaheadBuffer.getSample(ch, sampleIndex);
+			float grainBuffer1Sample = GranulatorTester::getGrainBuffer1(granulator).getSample(ch, sampleIndex);
+			CHECK(lookaheadSample == 1.f);
+			CHECK(grainBuffer1Sample == 0.f);
+		}
+	}
+
+	// Only want to test that all 1's buffer's are read from lookahead to grainBuffer in this test.
+	// Need to remove windowing for high contrast. Window shape is set in prepare() by default.
+	Window& window = GranulatorTester::getWindow(granulator);
+	window.setShape(Window::Shape::kNone);
 
 	CHECK(BufferHelper::isSilent(GranulatorTester::getGrainBuffer1(granulator)) == true);
 	CHECK(BufferHelper::isSilent(GranulatorTester::getGrainBuffer2(granulator)) == true);
@@ -243,7 +261,25 @@ TEST_CASE("Granulator fills GrainBuffers appropriately", "[Granulator][grainBuff
 	// grainBuffer1 is filled with entire input.lookaheadBuffer
 	// grainBuffer2 is still all 0's
 	granulator.granulate(input.lookaheadBuffer, input.processBuffer, input.detectedPeriod, input.shiftedPeriod);
-	CHECK(BufferHelper::buffersAreIdentical(GranulatorTester::getGrainBuffer1(granulator), input.lookaheadBuffer)); 
+	//REQUIRE(BufferHelper::buffersAreIdentical(input.lookaheadBuffer, GranulatorTester::getGrainBuffer1(granulator)));
+
+
+	for (int sampleIndex = 0; sampleIndex < numSamples; ++sampleIndex)
+	{
+		for (int ch = 0; ch < numChannels; ++ch)
+		{
+			float lookaheadSample = input.lookaheadBuffer.getSample(ch, sampleIndex);
+			float grainBuffer1Sample = GranulatorTester::getGrainBuffer1(granulator).getSample(ch, sampleIndex);
+			CHECK(lookaheadSample == 1.f);
+			CHECK(grainBuffer1Sample == 1.f);
+			if(grainBuffer1Sample != 1.f)
+				std::cout << "sampleIndex = " << sampleIndex << std::endl; 
+			
+		}
+	}
+
+
+	CHECK(BufferHelper::isSilent(GranulatorTester::getGrainBuffer1(granulator)) == false);
 	CHECK(BufferHelper::isSilent(GranulatorTester::getGrainBuffer2(granulator)) == true);
 
 }
