@@ -13,7 +13,8 @@
 #include "../SUBMODULES/RD/SOURCE/BufferRange.h"
 #include "../SUBMODULES/RD/SOURCE/BufferHelper.h"
 
-Granulator::Granulator()
+Granulator::Granulator(int numGrainBuffers)
+	: mGrainBuffers(numGrainBuffers)
 {
 	mWindow = std::make_unique<Window>();
 	//mWindow->setLooping(true);
@@ -34,15 +35,16 @@ void Granulator::prepare(double sampleRate, int blockSize, int lookaheadSize)
 {
 	mProcessBlockSize = blockSize;
 
-	mGrainBuffer1.clear();
-	mGrainBuffer1.setSize(2, lookaheadSize);
-	mGrainBuffer2.clear();
-	mGrainBuffer2.setSize(2, lookaheadSize);
-	mActiveGrainBuffer = 0;
+	for (auto& grainBuffer : mGrainBuffers)
+	{
+		grainBuffer.clear();
+		grainBuffer.setSize(2, lookaheadSize);
+	}
+	mActiveGrainBufferIndex = 0;
 	mNeedToFillActive = true;
 	mGrainReadPos = 0;
 	mWindow->setSizeShapePeriod(static_cast<int>(sampleRate), Window::Shape::kHanning, blockSize); // period updated after pitch detection
-    mWindow->setLooping(true);
+	mWindow->setLooping(true);
 }
 
 
@@ -61,9 +63,10 @@ void Granulator::granulate(juce::AudioBuffer<float>& lookaheadBuffer, juce::Audi
 	}
 		
 	// switching of active grain buffers happens here in sample loop (not channel loop though)
-	if(mGrainReadPos >= mGrainBuffer1.getNumSamples())
+	int grainBufferSize = _getActiveGrainBuffer().getNumSamples();
+	if(mGrainReadPos >= grainBufferSize)
 	{
-		mGrainReadPos = mGrainReadPos - mGrainBuffer1.getNumSamples(); // wrap read pos, both grain buffers are same size
+		mGrainReadPos = mGrainReadPos - grainBufferSize; // wrap read pos, all grain buffers are same size
 		_switchActiveBuffer();
 	}
 
@@ -86,13 +89,13 @@ bool Granulator::_shouldGranulateToInactiveBuffer()
 	// this function determines if we will run out of grain data in the current block
 	// block size of 256 samples will span from 0-255.
 	// So if we are starting at index 768 in grainBuffer and block size is 256,
-	// we won't granulate inactive buffer until next block. 
+	// we won't granulate inactive buffer until next block.
 	// b/c we have all the grain data needed to finish out current process block with active grain
 	int finalGrainReadPosThisBlock = mGrainReadPos + mProcessBlockSize - 1;
 
 	// we are about to read beyond the end of the active grain buffer
 	// in this processBlock, so granulate the next one and be ready to switch.
-	if(finalGrainReadPosThisBlock >= mGrainBuffer1.getNumSamples() || mGrainReadPos == 0)
+	if(finalGrainReadPosThisBlock >= _getActiveGrainBuffer().getNumSamples() || mGrainReadPos == 0)
 	{
 		shouldGranulate = true;
 	}
@@ -117,8 +120,19 @@ void Granulator::_granulateToInactiveGrainBuffer(juce::AudioBuffer<float>& buffe
 //=======================================
 void Granulator::_granulateToGrainBuffer(juce::AudioBuffer<float>& bufferToGranulate, juce::AudioBuffer<float>& grainBuffer, float detectedPeriod, float shiftedPeriod)
 {
-	grainBuffer.clear();
 	mWindow->setPeriod(static_cast<int>(detectedPeriod));
+
+	if(mCurrentAnalysisMarkIndex < 0)
+		mCurrentAnalysisMarkIndex = BufferHelper::getPeakIndex(bufferToGranulate, 0, (int)detectedPeriod);
+	else
+		mCurrentAnalysisMarkIndex = mCurrentAnalysisMarkIndex + (int)detectedPeriod;
+
+	int windowCenter = _getWindowCenterIndex(bufferToGranulate, mCurrentAnalysisMarkIndex, detectedPeriod);
+
+
+
+
+	
 
 	juce::int64 readStartIndex = 0;
 	juce::int64 readEndIndex = static_cast<juce::int64>(detectedPeriod - 1.f);
@@ -153,7 +167,43 @@ void Granulator::_granulateToGrainBuffer(juce::AudioBuffer<float>& bufferToGranu
 	}
 }
 
+//==========================================
+int Granulator::_getNextAnalysisMarkIndex(juce::AudioBuffer<float>& buffer, float detectedPeriod, int currentIndex)
+{
+	int updatedIndex = currentIndex;
 
+	if(updatedIndex < 0)
+	{
+		updatedIndex = BufferHelper::getPeakIndex(buffer, 0, (int)detectedPeriod);
+	}
+	else
+	{
+		int predictedMarkIndex = updatedIndex + (int)detectedPeriod;
+
+	}
+}
+
+//==========================================
+int Granulator::_getWindowCenterIndex(juce::AudioBuffer<float>& buffer, int analysisMarkIndex, float detectedPeriod)
+{
+	int centerIndex = analysisMarkIndex;
+
+	int radius = (int)(detectedPeriod / 4.f);
+	centerIndex = BufferHelper::getPeakIndex(buffer, predictedMarkIndex - radius, predictedMarkIndex + radius);
+}
+
+//==========================================
+int Granulator::_getNextSynthMarkIndex(juce::AudioBuffer<float>& buffer, float detectedPeriod, float shiftedPeriod)
+{
+	if(mCurrentSynthMarkIndex < 0)
+	{
+		mCurrentSynthMarkIndex = mCurrentAnalysisMarkIndex; // first one lines up
+	}
+	else
+	{
+
+	}
+}
 
 //=======================================
 void Granulator::_writeFromGrainBufferToProcessBlock(juce::AudioBuffer<float>& processBlock)
@@ -173,28 +223,24 @@ void Granulator::_writeFromGrainBufferToProcessBlock(juce::AudioBuffer<float>& p
 //=======================================
 void Granulator::_switchActiveBuffer()
 {
-	if(mActiveGrainBuffer == 0)
-		mActiveGrainBuffer = 1;
-	else if(mActiveGrainBuffer == 1)
-		mActiveGrainBuffer = 0;
+	// Clear the buffer that is becoming inactive (the current active one)
+	mGrainBuffers[mActiveGrainBufferIndex].clear();
+
+	// Switch to the next buffer
+	mActiveGrainBufferIndex = (mActiveGrainBufferIndex + 1) % static_cast<int>(mGrainBuffers.size());
 }
 
 //=======================================
 juce::AudioBuffer<float>& Granulator::_getActiveGrainBuffer()
 {
-	if(mActiveGrainBuffer == 0)
-		return mGrainBuffer1;
-	else
-		return mGrainBuffer2;
+	return mGrainBuffers[mActiveGrainBufferIndex];
 }
 
 //=======================================
 juce::AudioBuffer<float>& Granulator::_getInactiveGrainBuffer()
 {
-	if(mActiveGrainBuffer == 0)
-		return mGrainBuffer2;
-	else
-		return mGrainBuffer1;
+	int inactiveIndex = (mActiveGrainBufferIndex + 1) % static_cast<int>(mGrainBuffers.size());
+	return mGrainBuffers[inactiveIndex];
 }
 
 
