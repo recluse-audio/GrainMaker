@@ -6,6 +6,7 @@
  #pragma once
 #include "Util/Juce_Header.h"
 #include <vector>
+#include <tuple>
 
 // Suppress MSVC warning C4244 from Window.h and std::unique_ptr<Window> usage
 #if defined(_MSC_VER)
@@ -109,6 +110,7 @@ private:
 	
 	int _getNextAnalysisMarkIndex(juce::AudioBuffer<float>& buffer, float detectedPeriod, int currentIndex);
 	int _getWindowCenterIndex(juce::AudioBuffer<float>& buffer, int analysisMarkIndex, float detectedPeriod);
+	std::tuple<int, int, int> _getWindowBounds(juce::AudioBuffer<float>& buffer, int analysisMarkIndex, float detectedPeriod);
 	int _getNextSynthMarkIndex(float detectedPeriod, float shiftedPeriod, int currentSynthMarkIndex, int currentAnalysisMarkIndex);
 	
 	int mCurrentAnalysisMarkIndex = -1;
