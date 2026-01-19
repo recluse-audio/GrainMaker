@@ -97,7 +97,34 @@ public:
 	{
 		granulator._granulateToGrainBuffer(lookahead, grainBuffer, spilloverBuffer, detectedPeriod, shiftedPeriod);
 	}
+
+	// Analysis/Synthesis mark accessors
+	static int getNextAnalysisMarkIndex(Granulator& granulator, juce::AudioBuffer<float>& buffer,
+										float detectedPeriod, int currentIndex)
+	{
+		return granulator._getNextAnalysisMarkIndex(buffer, detectedPeriod, currentIndex);
+	}
+
+	static int getWindowCenterIndex(Granulator& granulator, juce::AudioBuffer<float>& buffer,
+									int analysisMarkIndex, float detectedPeriod)
+	{
+		return granulator._getWindowCenterIndex(buffer, analysisMarkIndex, detectedPeriod);
+	}
+
+	static std::tuple<int, int, int> getWindowBounds(Granulator& granulator, juce::AudioBuffer<float>& buffer,
+													 int analysisMarkIndex, float detectedPeriod)
+	{
+		return granulator._getWindowBounds(buffer, analysisMarkIndex, detectedPeriod);
+	}
+
+	static int getNextSynthMarkIndex(Granulator& granulator, float detectedPeriod, float shiftedPeriod,
+									 int currentSynthMarkIndex, int currentAnalysisMarkIndex)
+	{
+		return granulator._getNextSynthMarkIndex(detectedPeriod, shiftedPeriod, currentSynthMarkIndex, currentAnalysisMarkIndex);
+	}
 };
+//=======================================================================================
+//=======================================================================================
 
 /**
  * @brief Helper struct to encapsulate common test input parameters for Granulator
@@ -314,13 +341,13 @@ TEST_CASE("Granulator fills GrainBuffers appropriately", "[Granulator][grainBuff
 	CHECK(GranulatorTester::getSpilloverBufferIndex(granulator) == 2);
 
 	// double check that we are starting with index [0] as expected. mGrainBuffer[0] should be first read buffer
-	REQUIRE(BufferHelper::buffersAreIdentical(GranulatorTester::getBufferByIndex(granulator, 0), GranulatorTester::getReadingBuffer(granulator)));
+	CHECK(BufferHelper::buffersAreIdentical(GranulatorTester::getBufferByIndex(granulator, 0), GranulatorTester::getReadingBuffer(granulator)));
 	CHECK(BufferHelper::isSilent(GranulatorTester::getReadingBuffer(granulator)) == false);
 	CHECK(BufferHelper::isSilent(GranulatorTester::getWritingBuffer(granulator)) == true);
 
-	// GRANULATE #2 [256-512]
+	// GRANULATE #2 [256-511]
 	granulator.granulate(input.lookaheadBuffer, input.processBuffer, input.detectedPeriod, input.shiftedPeriod);
-	REQUIRE(BufferHelper::buffersAreIdentical(GranulatorTester::getBufferByIndex(granulator, 0), GranulatorTester::getReadingBuffer(granulator)));
+	CHECK(BufferHelper::buffersAreIdentical(GranulatorTester::getBufferByIndex(granulator, 0), GranulatorTester::getReadingBuffer(granulator)));
 	CHECK(BufferHelper::isSilent(GranulatorTester::getReadingBuffer(granulator)) == false);
 	CHECK(BufferHelper::isSilent(GranulatorTester::getWritingBuffer(granulator)) == true);
 	CHECK(GranulatorTester::getReadingBufferIndex(granulator) == 0);
@@ -329,7 +356,7 @@ TEST_CASE("Granulator fills GrainBuffers appropriately", "[Granulator][grainBuff
 
 	// GRANULATE #3 [512-767]
 	granulator.granulate(input.lookaheadBuffer, input.processBuffer, input.detectedPeriod, input.shiftedPeriod);
-	REQUIRE(BufferHelper::buffersAreIdentical(GranulatorTester::getBufferByIndex(granulator, 0), GranulatorTester::getReadingBuffer(granulator)));
+	CHECK(BufferHelper::buffersAreIdentical(GranulatorTester::getBufferByIndex(granulator, 0), GranulatorTester::getReadingBuffer(granulator)));
 	CHECK(BufferHelper::isSilent(GranulatorTester::getReadingBuffer(granulator)) == false);
 	CHECK(BufferHelper::isSilent(GranulatorTester::getWritingBuffer(granulator)) == true);
 	CHECK(GranulatorTester::getReadingBufferIndex(granulator) == 0);
@@ -338,24 +365,67 @@ TEST_CASE("Granulator fills GrainBuffers appropriately", "[Granulator][grainBuff
 
 	// GRANLULATE #4 [768-1023]
 	granulator.granulate(input.lookaheadBuffer, input.processBuffer, input.detectedPeriod, input.shiftedPeriod);
-	REQUIRE(BufferHelper::buffersAreIdentical(GranulatorTester::getBufferByIndex(granulator, 0), GranulatorTester::getReadingBuffer(granulator)));
+	CHECK(BufferHelper::buffersAreIdentical(GranulatorTester::getBufferByIndex(granulator, 0), GranulatorTester::getReadingBuffer(granulator)));
 	CHECK(BufferHelper::isSilent(GranulatorTester::getReadingBuffer(granulator)) == false);
 	CHECK(BufferHelper::isSilent(GranulatorTester::getWritingBuffer(granulator)) == true);
 	CHECK(GranulatorTester::getReadingBufferIndex(granulator) == 0);
 	CHECK(GranulatorTester::getWritingBufferIndex(granulator) == 1);
 	CHECK(GranulatorTester::getSpilloverBufferIndex(granulator) == 2);
 
-	// GRANULATE #5 --TRANSITION-- [1024-1280]
+	// GRANULATE #5 [0-255]
 	// at this point we should have switched to index 1 buffer and cleared index 0
 	granulator.granulate(input.lookaheadBuffer, input.processBuffer, input.detectedPeriod, input.shiftedPeriod);
-	REQUIRE(BufferHelper::buffersAreIdentical(GranulatorTester::getBufferByIndex(granulator, 1), GranulatorTester::getReadingBuffer(granulator)));
+	CHECK(BufferHelper::buffersAreIdentical(GranulatorTester::getBufferByIndex(granulator, 1), GranulatorTester::getReadingBuffer(granulator)));
 	CHECK(BufferHelper::isSilent(GranulatorTester::getBufferByIndex(granulator, 0)) == true);
 	CHECK(BufferHelper::isSilent(GranulatorTester::getBufferByIndex(granulator, 1)) == false);
 	CHECK(BufferHelper::isSilent(GranulatorTester::getBufferByIndex(granulator, 2)) == true);
-	// Indices
 	CHECK(GranulatorTester::getReadingBufferIndex(granulator) == 1);
 	CHECK(GranulatorTester::getWritingBufferIndex(granulator) == 2);
 	CHECK(GranulatorTester::getSpilloverBufferIndex(granulator) == 0);
+
+	// GRANULATE #6 [256-511]
+	// at this point we should have switched to index 1 buffer and cleared index 0
+	granulator.granulate(input.lookaheadBuffer, input.processBuffer, input.detectedPeriod, input.shiftedPeriod);
+	CHECK(BufferHelper::buffersAreIdentical(GranulatorTester::getBufferByIndex(granulator, 1), GranulatorTester::getReadingBuffer(granulator)));
+	CHECK(BufferHelper::isSilent(GranulatorTester::getBufferByIndex(granulator, 0)) == true);
+	CHECK(BufferHelper::isSilent(GranulatorTester::getBufferByIndex(granulator, 1)) == false);
+	CHECK(BufferHelper::isSilent(GranulatorTester::getBufferByIndex(granulator, 2)) == true);
+	CHECK(GranulatorTester::getReadingBufferIndex(granulator) == 1);
+	CHECK(GranulatorTester::getWritingBufferIndex(granulator) == 2);
+	CHECK(GranulatorTester::getSpilloverBufferIndex(granulator) == 0);
+
+	// GRANULATE #7 [512-767]
+	// at this point we should have switched to index 1 buffer and cleared index 0
+	granulator.granulate(input.lookaheadBuffer, input.processBuffer, input.detectedPeriod, input.shiftedPeriod);
+	CHECK(BufferHelper::buffersAreIdentical(GranulatorTester::getBufferByIndex(granulator, 1), GranulatorTester::getReadingBuffer(granulator)));
+	CHECK(BufferHelper::isSilent(GranulatorTester::getBufferByIndex(granulator, 0)) == true);
+	CHECK(BufferHelper::isSilent(GranulatorTester::getBufferByIndex(granulator, 1)) == false);
+	CHECK(BufferHelper::isSilent(GranulatorTester::getBufferByIndex(granulator, 2)) == true);
+	CHECK(GranulatorTester::getReadingBufferIndex(granulator) == 1);
+	CHECK(GranulatorTester::getWritingBufferIndex(granulator) == 2);
+	CHECK(GranulatorTester::getSpilloverBufferIndex(granulator) == 0);
+
+	// GRANULATE #8 [768-1023]
+	// at this point we should have switched to index 1 buffer and cleared index 0
+	granulator.granulate(input.lookaheadBuffer, input.processBuffer, input.detectedPeriod, input.shiftedPeriod);
+	CHECK(BufferHelper::buffersAreIdentical(GranulatorTester::getBufferByIndex(granulator, 1), GranulatorTester::getReadingBuffer(granulator)));
+	CHECK(BufferHelper::isSilent(GranulatorTester::getBufferByIndex(granulator, 0)) == true);
+	CHECK(BufferHelper::isSilent(GranulatorTester::getBufferByIndex(granulator, 1)) == false);
+	CHECK(BufferHelper::isSilent(GranulatorTester::getBufferByIndex(granulator, 2)) == true);
+	CHECK(GranulatorTester::getReadingBufferIndex(granulator) == 1);
+	CHECK(GranulatorTester::getWritingBufferIndex(granulator) == 2);
+	CHECK(GranulatorTester::getSpilloverBufferIndex(granulator) == 0);
+
+	// GRANULATE #9 --TRANSITION-- [0-255]
+	// at this point we should have switched to index 1 buffer and cleared index 0
+	granulator.granulate(input.lookaheadBuffer, input.processBuffer, input.detectedPeriod, input.shiftedPeriod);
+	CHECK(BufferHelper::buffersAreIdentical(GranulatorTester::getBufferByIndex(granulator, 2), GranulatorTester::getReadingBuffer(granulator)));
+	CHECK(BufferHelper::isSilent(GranulatorTester::getBufferByIndex(granulator, 0)) == true);
+	CHECK(BufferHelper::isSilent(GranulatorTester::getBufferByIndex(granulator, 1)) == true);
+	CHECK(BufferHelper::isSilent(GranulatorTester::getBufferByIndex(granulator, 2)) == false);
+	CHECK(GranulatorTester::getReadingBufferIndex(granulator) == 2);
+	CHECK(GranulatorTester::getWritingBufferIndex(granulator) == 0);
+	CHECK(GranulatorTester::getSpilloverBufferIndex(granulator) == 1);
 
 }
 
@@ -450,6 +520,7 @@ TEST_CASE("mGrainReadPos is incremented properly when writing to processBlock()"
 	CHECK(input.processBuffer.getNumSamples() == 256);
 }
 
+
 //********************************************************************************************/
 
 
@@ -458,138 +529,108 @@ TEST_CASE("mGrainReadPos is incremented properly when writing to processBlock()"
 //==============================================================================
 //==============================================================================
 //==============================================================================
-TEST_CASE("Testing '' - how grainBuffers are filled from lookaheadBuffer", "[Granulator][grainBuffer]")
+TEST_CASE("Analysis mark index calculations", "[Granulator][Marks]")
 {
 	TestUtils::SetupAndTeardown setupAndTeardown;
 	Granulator granulator;
 	MockProcessorInput input;
 
-	// Fill lookaheadBuffer with grains who's sample values correspond with their grain number
-	// Grain size = 2 * detectedPeriod (2 cycles per grain)
-	// With detectedPeriod = 128, each grain is 256 samples
-	// grain 1: [0-255] -> set to 1.f
-	// grain 2: [256-511] -> set to 2.f
-	// grain 3: [512-767] -> set to 3.f
-	// grain 4: [768-1023] -> set to 4.f
+	// Unrelated to other test sections in this test case
+	// just making sure it handles first lookahead properly (negative current index)
+	SECTION("When current index is negative, we create first mark based on peak within first period")
+	{
+		juce::AudioBuffer<float> firstPeriodBuffer(2, 128);
+		firstPeriodBuffer.clear();
+		BufferFiller::fillWithAllOnes(firstPeriodBuffer);
+		BufferFiller::fillRangeWithValue(firstPeriodBuffer, 64, 64, 1.1); // index 64 will be mark location;
+		int result = GranulatorTester::getNextAnalysisMarkIndex(granulator, firstPeriodBuffer, 128, -1);
+		CHECK(result == 64);
+	}
 
 	juce::AudioBuffer<float>& lookaheadBuffer = input.lookaheadBuffer;
 	lookaheadBuffer.clear();
-	BufferFiller::fillRangeWithValue(lookaheadBuffer, 0, 255, 1.f);
-	BufferFiller::fillRangeWithValue(lookaheadBuffer, 256, 511, 2.f);
-	BufferFiller::fillRangeWithValue(lookaheadBuffer, 512, 767, 3.f);
-	BufferFiller::fillRangeWithValue(lookaheadBuffer, 768, 1023, 4.f);
 
-
-	granulator.prepare(input.testSampleRate, input.testBlockSize, input.testLookaheadSize);
-	Window& window = GranulatorTester::getWindow(granulator);
-	window.setShape(Window::Shape::kNone);
-
-	juce::AudioBuffer<float>& readingBuffer = GranulatorTester::getReadingBuffer(granulator);
-	int numChannels = readingBuffer.getNumChannels();
-
-
-}
-//********************************************************************************************/
-
-
-//==============================================================================
-//==============================================================================
-//==============================================================================
-//==============================================================================
-//==============================================================================
-TEST_CASE("Testing '_granulateToGrainBuffer()' - how grainBuffers are filled from lookaheadBuffer", "[Granulator][grainBuffer]")
-{
-	TestUtils::SetupAndTeardown setupAndTeardown;
-	Granulator granulator;
-	MockProcessorInput input;
-
-	// Fill lookaheadBuffer with grains who's sample values correspond with their grain number
-	// Grain size = 2 * detectedPeriod (2 cycles per grain)
-	// With detectedPeriod = 128, each grain is 256 samples
-	// grain 1: [0-255] -> set to 1.f
-	// grain 2: [256-511] -> set to 2.f
-	// grain 3: [512-767] -> set to 3.f
-	// grain 4: [768-1023] -> set to 4.f
-
-	juce::AudioBuffer<float>& lookaheadBuffer = input.lookaheadBuffer;
-	lookaheadBuffer.clear();
-	BufferFiller::fillRangeWithValue(lookaheadBuffer, 0, 255, 1.f);
-	BufferFiller::fillRangeWithValue(lookaheadBuffer, 256, 511, 2.f);
-	BufferFiller::fillRangeWithValue(lookaheadBuffer, 512, 767, 3.f);
-	BufferFiller::fillRangeWithValue(lookaheadBuffer, 768, 1023, 4.f);
-
-
-	granulator.prepare(input.testSampleRate, input.testBlockSize, input.testLookaheadSize);
-	Window& window = GranulatorTester::getWindow(granulator);
-	window.setShape(Window::Shape::kNone);
-
-	juce::AudioBuffer<float>& readingBuffer = GranulatorTester::getReadingBuffer(granulator);
-	juce::AudioBuffer<float>& spilloverBuffer = GranulatorTester::getSpilloverBuffer(granulator);
-	int numChannels = readingBuffer.getNumChannels();
-
-	SECTION("No shifting, grains of size 256 (2x period of 128) are positioned accordingly.")
+	SECTION("getNextAnalysisMarkIndex returns expected index")
 	{
-		input.detectedPeriod = 128.f;
-		input.shiftedPeriod = 128.f; // no shifting
+		int result = GranulatorTester::getNextAnalysisMarkIndex(granulator, lookaheadBuffer, input.detectedPeriod, -1);
+		CHECK(result == 0);
+		auto [start1, center1, end1] = GranulatorTester::getWindowBounds(granulator, lookaheadBuffer, result, input.detectedPeriod);
+		CHECK(start1 == -128);
+		CHECK(center1 == 0);
+		CHECK(end1 == 127);
 
-		GranulatorTester::granulateToGrainBuffer(granulator, input.lookaheadBuffer, readingBuffer, spilloverBuffer,
-												input.detectedPeriod, input.shiftedPeriod);
+		result = GranulatorTester::getNextAnalysisMarkIndex(granulator, lookaheadBuffer, input.detectedPeriod, result);
+		CHECK(result == 128);
+		auto [start2, center2, end2] = GranulatorTester::getWindowBounds(granulator, lookaheadBuffer, result, input.detectedPeriod);
+		CHECK(start2 == 0);
+		CHECK(center2 == 128);
+		CHECK(end2 == 255);
 
-		// GRAIN 1: [0-255] -> 1.f
-		for (int i = 0; i <= 255; ++i)
-			for (int ch = 0; ch < numChannels; ++ch)
-				CHECK(readingBuffer.getSample(ch, i) == 1.f);
+		result = GranulatorTester::getNextAnalysisMarkIndex(granulator, lookaheadBuffer, input.detectedPeriod, result);
+		CHECK(result == 256);
+		auto [start3, center3, end3] = GranulatorTester::getWindowBounds(granulator, lookaheadBuffer, result, input.detectedPeriod);
+		CHECK(start3 == 128);
+		CHECK(center3 == 256);
+		CHECK(end3 == 383);
 
-		// GRAIN 2: [256-511] -> 2.f
-		for (int i = 256; i <= 511; ++i)
-			for (int ch = 0; ch < numChannels; ++ch)
-				CHECK(readingBuffer.getSample(ch, i) == 2.f);
+		result = GranulatorTester::getNextAnalysisMarkIndex(granulator, lookaheadBuffer, input.detectedPeriod, result);
+		CHECK(result == 384);
+		auto [start4, center4, end4] = GranulatorTester::getWindowBounds(granulator, lookaheadBuffer, result, input.detectedPeriod);
+		CHECK(start4 == 256);
+		CHECK(center4 == 384);
+		CHECK(end4 == 511);
 
-		// GRAIN 3: [512-767] -> 3.f
-		for (int i = 512; i <= 767; ++i)
-			for (int ch = 0; ch < numChannels; ++ch)
-				CHECK(readingBuffer.getSample(ch, i) == 3.f);
+		result = GranulatorTester::getNextAnalysisMarkIndex(granulator, lookaheadBuffer, input.detectedPeriod, result);
+		CHECK(result == 512);
+		auto [start5, center5, end5] = GranulatorTester::getWindowBounds(granulator, lookaheadBuffer, result, input.detectedPeriod);
+		CHECK(start5 == 384);
+		CHECK(center5 == 512);
+		CHECK(end5 == 639);
 
-		// GRAIN 4: [768-1023] -> 4.f
-		for (int i = 768; i <= 1023; ++i)
-			for (int ch = 0; ch < numChannels; ++ch)
-				CHECK(readingBuffer.getSample(ch, i) == 4.f);
+		result = GranulatorTester::getNextAnalysisMarkIndex(granulator, lookaheadBuffer, input.detectedPeriod, result);
+		CHECK(result == 640);
+		auto [start6, center6, end6] = GranulatorTester::getWindowBounds(granulator, lookaheadBuffer, result, input.detectedPeriod);
+		CHECK(start6 == 512);
+		CHECK(center6 == 640);
+		CHECK(end6 == 767);
+
+		result = GranulatorTester::getNextAnalysisMarkIndex(granulator, lookaheadBuffer, input.detectedPeriod, result);
+		CHECK(result == 768);
+		auto [start7, center7, end7] = GranulatorTester::getWindowBounds(granulator, lookaheadBuffer, result, input.detectedPeriod);
+		CHECK(start7 == 640);
+		CHECK(center7 == 768);
+		CHECK(end7 == 895);
+
+		result = GranulatorTester::getNextAnalysisMarkIndex(granulator, lookaheadBuffer, input.detectedPeriod, result);
+		CHECK(result == 896);
+		auto [start8, center8, end8] = GranulatorTester::getWindowBounds(granulator, lookaheadBuffer, result, input.detectedPeriod);
+		CHECK(start8 == 768);
+		CHECK(center8 == 896);
+		CHECK(end8 == 1023);
+
+		result = GranulatorTester::getNextAnalysisMarkIndex(granulator, lookaheadBuffer, input.detectedPeriod, result);
+		CHECK(result == 0);
+		auto [start9, center9, end9] = GranulatorTester::getWindowBounds(granulator, lookaheadBuffer, result, input.detectedPeriod);
+		CHECK(start9 == -128);
+		CHECK(center9 == 0);
+		CHECK(end9 == 127);
 	}
 
-	SECTION("Shifting up, overlap expected at overlapping indices")
+	SECTION("getWindowCenterIndex returns expected index")
 	{
-		// input.detectedPeriod = 128.f;
-		// input.shiftedPeriod = 96.f; // shifting up (grains placed closer together)
-
-		// GranulatorTester::granulateToGrainBuffer(granulator, input.lookaheadBuffer, grainBuffer1,
-		// 										input.detectedPeriod, input.shiftedPeriod);
-
-		// // With shiftedPeriod = 192, grains (256 samples each) are written at intervals of 192 samples
-		// // Grain 1: written at [0-255]
-		// // Grain 2: written at [192-447] (overlaps with grain 1 at [192-255])
-		// // Grain 3: written at [384-639] (overlaps with grain 2 at [384-447])
-		// // Grain 4: written at [576-831] (overlaps with grain 3 at [576-639])
-
-		// // GRAIN 1 non-overlap: [0-191] -> 1.f
-		// for (int i = 0; i <= 191; ++i)
-		// 	for (int ch = 0; ch < numChannels; ++ch)
-		// 		CHECK(grainBuffer1.getSample(ch, i) == 1.f);
-
-		// // GRAIN 2 non-overlap: [256-383] -> 2.f
-		// for (int i = 256; i <= 383; ++i)
-		// 	for (int ch = 0; ch < numChannels; ++ch)
-		// 		CHECK(grainBuffer1.getSample(ch, i) == 2.f);
-
-		// // GRAIN 3 non-overlap: [448-575] -> 3.f
-		// for (int i = 448; i <= 575; ++i)
-		// 	for (int ch = 0; ch < numChannels; ++ch)
-		// 		CHECK(grainBuffer1.getSample(ch, i) == 3.f);
-
-		// // GRAIN 4 non-overlap: [640-831] -> 4.f
-		// for (int i = 640; i <= 831; ++i)
-		// 	for (int ch = 0; ch < numChannels; ++ch)
-		// 		CHECK(grainBuffer1.getSample(ch, i) == 4.f);
+		// TODO: Set up test conditions
+		// int analysisMarkIndex = ...;
+		// int result = GranulatorTester::getWindowCenterIndex(granulator, lookaheadBuffer, analysisMarkIndex, input.detectedPeriod);
+		// CHECK(result == expectedValue);
 	}
 
+	SECTION("getNextSynthMarkIndex returns expected index")
+	{
+		// TODO: Set up test conditions
+		// int currentSynthMarkIndex = ...;
+		// int currentAnalysisMarkIndex = ...;
+		// int result = GranulatorTester::getNextSynthMarkIndex(granulator, input.detectedPeriod, input.shiftedPeriod, currentSynthMarkIndex, currentAnalysisMarkIndex);
+		// CHECK(result == expectedValue);
+	}
 }
 

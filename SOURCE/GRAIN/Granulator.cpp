@@ -166,18 +166,22 @@ void Granulator::_granulateToGrainBuffer(juce::AudioBuffer<float>& bufferToGranu
 }
 
 //==========================================
-int Granulator::_getNextAnalysisMarkIndex(juce::AudioBuffer<float>& buffer, float detectedPeriod, int currentIndex)
+int Granulator::_getNextAnalysisMarkIndex(juce::AudioBuffer<float>& lookaheadBuffer, float detectedPeriod, int currentIndex)
 {
 	int updatedIndex = currentIndex;
 
 	if(updatedIndex < 0)
 	{
-		updatedIndex = BufferHelper::getPeakIndex(buffer, 0, (int)detectedPeriod);
+		updatedIndex = BufferHelper::getPeakIndex(lookaheadBuffer, 0, (int)detectedPeriod);
 	}
 	else
 	{
 		updatedIndex = updatedIndex + (int)detectedPeriod;
 	}
+
+	// wrap around lookaheadBuffer
+	if(updatedIndex >= lookaheadBuffer.getNumSamples())
+		updatedIndex = updatedIndex - lookaheadBuffer.getNumSamples();
 
 	return updatedIndex;
 
@@ -189,9 +193,18 @@ int Granulator::_getWindowCenterIndex(juce::AudioBuffer<float>& buffer, int anal
 	int centerIndex = analysisMarkIndex;
 
 	int radius = (int)(detectedPeriod / 4.f);
-	centerIndex = BufferHelper::getPeakIndex(buffer, centerIndex - radius, centerIndex + radius);
+	centerIndex = BufferHelper::getPeakIndex(buffer, centerIndex - radius, centerIndex + radius, centerIndex);
 
 	return centerIndex;
+}
+
+//==========================================
+std::tuple<int, int, int> Granulator::_getWindowBounds(juce::AudioBuffer<float>& buffer, int analysisMarkIndex, float detectedPeriod)
+{
+	int center = _getWindowCenterIndex(buffer, analysisMarkIndex, detectedPeriod);
+	int start = center - detectedPeriod;
+	int end = center + detectedPeriod - 1;
+	return {start, center, end};
 }
 
 //==========================================
