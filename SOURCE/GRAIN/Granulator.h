@@ -21,24 +21,38 @@
 
 #include "../SUBMODULES/RD/SOURCE/BufferRange.h"
 
-// Number of grain buffers for double/multi-buffering
-static constexpr int kDefaultNumGrainBuffers = 2;
+// Number of grain buffers for triple-buffering (Reading, Writing, Spillover)
+static constexpr int kNumGrainBuffers = 3;
+
+/**
+ * @brief States for grain buffer management
+ * - Reading: Buffer being read from for output (not written to)
+ * - Writing: Buffer being filled with new grain data
+ * - Spillover: Receives overflow from Writing buffer, cleared when entering this state
+ */
+enum class GrainBufferState
+{
+	Reading,
+	Writing,
+	Spillover
+};
+
  /**
-  * @brief This class is intended to perform the read/write operations 
+  * @brief This class is intended to perform the read/write operations
   * of granulating a buffer and writing it to another, getting a windowed portion of it, etc.
-  * 
+  *
   */
  class Granulator
  {
 public:
-	Granulator(int numGrainBuffers = kDefaultNumGrainBuffers);
+	Granulator();
 	~Granulator();
 
 	void prepare(double sampleRate, int blockSize, int lookaheadSize);
 
 	int getNumGrainBuffers() const { return static_cast<int>(mGrainBuffers.size()); }
 
-	juce::AudioBuffer<float>& getActiveGrainBuffer();
+	juce::AudioBuffer<float>& getReadingBuffer();
 
 	void granulate(juce::AudioBuffer<float>& lookaheadBuffer, juce::AudioBuffer<float>& processBlock,
 				float detectedPeriod, float shiftedPeriod);
@@ -47,35 +61,40 @@ private:
 	friend class GranulatorTester;
 	int mProcessBlockSize = 0;
 	std::vector<juce::AudioBuffer<float>> mGrainBuffers;
-	int mActiveGrainBufferIndex = 0;
+
+	// Buffer state indices - each points to a different buffer
+	int mReadingBufferIndex = 0;   // Buffer being read from for output
+	int mWritingBufferIndex = 1;   // Buffer being filled with grain data
+	int mSpilloverBufferIndex = 2; // Receives overflow, cleared on transition to this state
+
 	// pos to read from grainBuffer and to write in processBlock
 	int mGrainReadPos = 0;
 	int mProcessBlockWritePos = 0;
 
-	bool mNeedToFillActive = true;
+	bool mNeedToFillReading = true;
 
-	bool _shouldGranulateToActiveBuffer();
-	// if mGrainReadPos will extend past active grain buffer's size then we need to granulate to inactive buffer
-	bool _shouldGranulateToInactiveBuffer();
+	bool _shouldGranulateToReadingBuffer();
+	// if mGrainReadPos will extend past reading buffer's size then we need to granulate to writing buffer
+	bool _shouldGranulateToWritingBuffer();
 
 	// This is expected after a prepareToPlay is called or a reset occurs
-	// normal operation we would write to inactive though.
-	void _granulateToActiveGrainBuffer(juce::AudioBuffer<float>& bufferToGranulate, float detectedPeriod, float shiftedPeriod);
+	void _granulateToReadingBuffer(juce::AudioBuffer<float>& bufferToGranulate, float detectedPeriod, float shiftedPeriod);
 
-	void _granulateToInactiveGrainBuffer(juce::AudioBuffer<float>& bufferToGranulate, float detectedPeriod, float shiftedPeriod);
+	void _granulateToWritingBuffer(juce::AudioBuffer<float>& bufferToGranulate, float detectedPeriod, float shiftedPeriod);
 
-	void _granulateToGrainBuffer(juce::AudioBuffer<float>& bufferToGranulate, juce::AudioBuffer<float>& grainBuffer, float detectedPeriod, float shiftedPeriod);
+	void _granulateToGrainBuffer(juce::AudioBuffer<float>& bufferToGranulate, juce::AudioBuffer<float>& grainBuffer,
+								juce::AudioBuffer<float>& spilloverBuffer, float detectedPeriod, float shiftedPeriod);
 
 
 	//
 	void _writeFromGrainBufferToProcessBlock(juce::AudioBuffer<float>& processBlock);
 
-	// This happens when mGrainReadPos surpasses mGrainBuffer size.
-	// need to check per-sample so we know when to switch from one to the next. T
-	void _switchActiveBuffer();
+	// Rotates buffer states: Reading->Spillover (cleared), Writing->Reading, Spillover->Writing (keeps data)
+	void _rotateBufferStates();
 
-	juce::AudioBuffer<float>& _getActiveGrainBuffer();
-	juce::AudioBuffer<float>& _getInactiveGrainBuffer();
+	juce::AudioBuffer<float>& _getReadingBuffer();
+	juce::AudioBuffer<float>& _getWritingBuffer();
+	juce::AudioBuffer<float>& _getSpilloverBuffer();
 	
 	std::unique_ptr<Window> mWindow;
 
@@ -90,7 +109,7 @@ private:
 	
 	int _getNextAnalysisMarkIndex(juce::AudioBuffer<float>& buffer, float detectedPeriod, int currentIndex);
 	int _getWindowCenterIndex(juce::AudioBuffer<float>& buffer, int analysisMarkIndex, float detectedPeriod);
-	int _updateCurrentSynthMarkIndex(juce::AudioBuffer<float>& buffer, float detectedPeriod, float shiftedPeriod);
+	int _getNextSynthMarkIndex(float detectedPeriod, float shiftedPeriod, int currentSynthMarkIndex, int currentAnalysisMarkIndex);
 	
 	int mCurrentAnalysisMarkIndex = -1;
 	int mCurrentWindowCenterIndex = -1;
