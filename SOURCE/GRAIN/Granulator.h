@@ -110,8 +110,10 @@ private:
 	
 	int _getNextAnalysisMarkIndex(juce::AudioBuffer<float>& buffer, float detectedPeriod, int currentIndex);
 	int _getWindowCenterIndex(juce::AudioBuffer<float>& buffer, int analysisMarkIndex, float detectedPeriod);
-	std::tuple<int, int, int> _getWindowBounds(juce::AudioBuffer<float>& buffer, int analysisMarkIndex, float detectedPeriod);
+	std::tuple<int, int, int> _getAnalysisBounds(juce::AudioBuffer<float>& buffer, int analysisMarkIndex, float detectedPeriod);
+	std::tuple<int, int> _getSynthBounds(int synthMarkIndex, float detectedPeriod);
 	int _getNextSynthMarkIndex(float detectedPeriod, float shiftedPeriod, int currentSynthMarkIndex, int currentAnalysisMarkIndex);
+	int _getWrappedSynthMarkIndex(juce::AudioBuffer<float>& buffer, int synthMarkIndex);
 	
 	int mCurrentAnalysisMarkIndex = -1;
 	int mCurrentWindowCenterIndex = -1;

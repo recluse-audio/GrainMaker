@@ -114,13 +114,18 @@ public:
 	static std::tuple<int, int, int> getWindowBounds(Granulator& granulator, juce::AudioBuffer<float>& buffer,
 													 int analysisMarkIndex, float detectedPeriod)
 	{
-		return granulator._getWindowBounds(buffer, analysisMarkIndex, detectedPeriod);
+		return granulator._getAnalysisBounds(buffer, analysisMarkIndex, detectedPeriod);
 	}
 
 	static int getNextSynthMarkIndex(Granulator& granulator, float detectedPeriod, float shiftedPeriod,
 									 int currentSynthMarkIndex, int currentAnalysisMarkIndex)
 	{
 		return granulator._getNextSynthMarkIndex(detectedPeriod, shiftedPeriod, currentSynthMarkIndex, currentAnalysisMarkIndex);
+	}
+
+	static int getWrappedSynthMarkIndex(Granulator& granulator, juce::AudioBuffer<float>& buffer, int synthMarkIndex)
+	{
+		return granulator._getWrappedSynthMarkIndex(buffer, synthMarkIndex);
 	}
 };
 //=======================================================================================
@@ -529,11 +534,13 @@ TEST_CASE("mGrainReadPos is incremented properly when writing to processBlock()"
 //==============================================================================
 //==============================================================================
 //==============================================================================
-TEST_CASE("Analysis mark index calculations", "[Granulator][Marks]")
+TEST_CASE("Analysis and Synthesis mark index as well as window bounds calculations", "[Granulator][Marks]")
 {
 	TestUtils::SetupAndTeardown setupAndTeardown;
 	Granulator granulator;
 	MockProcessorInput input;
+
+	granulator.prepare(48000, input.processBuffer.getNumSamples(), input.lookaheadBuffer.getNumSamples());
 
 	// Unrelated to other test sections in this test case
 	// just making sure it handles first lookahead properly (negative current index)
@@ -550,87 +557,271 @@ TEST_CASE("Analysis mark index calculations", "[Granulator][Marks]")
 	juce::AudioBuffer<float>& lookaheadBuffer = input.lookaheadBuffer;
 	lookaheadBuffer.clear();
 
-	SECTION("getNextAnalysisMarkIndex returns expected index")
+	SECTION("No shift, starting at [0]")
 	{
-		int result = GranulatorTester::getNextAnalysisMarkIndex(granulator, lookaheadBuffer, input.detectedPeriod, -1);
-		CHECK(result == 0);
-		auto [start1, center1, end1] = GranulatorTester::getWindowBounds(granulator, lookaheadBuffer, result, input.detectedPeriod);
+		int currentAnalysisMarkIndex = -1;
+		int currentSynthMarkIndex = -1;
+
+		currentAnalysisMarkIndex = GranulatorTester::getNextAnalysisMarkIndex(granulator, lookaheadBuffer, input.detectedPeriod, -1);
+		CHECK(currentAnalysisMarkIndex == 0);
+		currentSynthMarkIndex = GranulatorTester::getNextSynthMarkIndex(granulator, input.detectedPeriod, input.shiftedPeriod, currentSynthMarkIndex, currentAnalysisMarkIndex);
+		CHECK(currentSynthMarkIndex == 0);
+		auto [start1, center1, end1] = GranulatorTester::getWindowBounds(granulator, lookaheadBuffer, currentAnalysisMarkIndex, input.detectedPeriod);
 		CHECK(start1 == -128);
 		CHECK(center1 == 0);
 		CHECK(end1 == 127);
 
-		result = GranulatorTester::getNextAnalysisMarkIndex(granulator, lookaheadBuffer, input.detectedPeriod, result);
-		CHECK(result == 128);
-		auto [start2, center2, end2] = GranulatorTester::getWindowBounds(granulator, lookaheadBuffer, result, input.detectedPeriod);
+		currentAnalysisMarkIndex = GranulatorTester::getNextAnalysisMarkIndex(granulator, lookaheadBuffer, input.detectedPeriod, currentAnalysisMarkIndex);
+		CHECK(currentAnalysisMarkIndex == 128);
+		currentSynthMarkIndex = GranulatorTester::getNextSynthMarkIndex(granulator, input.detectedPeriod, input.shiftedPeriod, currentSynthMarkIndex, currentAnalysisMarkIndex);
+		CHECK(currentSynthMarkIndex == 128);
+		auto [start2, center2, end2] = GranulatorTester::getWindowBounds(granulator, lookaheadBuffer, currentAnalysisMarkIndex, input.detectedPeriod);
 		CHECK(start2 == 0);
 		CHECK(center2 == 128);
 		CHECK(end2 == 255);
 
-		result = GranulatorTester::getNextAnalysisMarkIndex(granulator, lookaheadBuffer, input.detectedPeriod, result);
-		CHECK(result == 256);
-		auto [start3, center3, end3] = GranulatorTester::getWindowBounds(granulator, lookaheadBuffer, result, input.detectedPeriod);
+		currentAnalysisMarkIndex = GranulatorTester::getNextAnalysisMarkIndex(granulator, lookaheadBuffer, input.detectedPeriod, currentAnalysisMarkIndex);
+		CHECK(currentAnalysisMarkIndex == 256);
+		currentSynthMarkIndex = GranulatorTester::getNextSynthMarkIndex(granulator, input.detectedPeriod, input.shiftedPeriod, currentSynthMarkIndex, currentAnalysisMarkIndex);
+		CHECK(currentSynthMarkIndex == 256);
+		auto [start3, center3, end3] = GranulatorTester::getWindowBounds(granulator, lookaheadBuffer, currentAnalysisMarkIndex, input.detectedPeriod);
 		CHECK(start3 == 128);
 		CHECK(center3 == 256);
 		CHECK(end3 == 383);
 
-		result = GranulatorTester::getNextAnalysisMarkIndex(granulator, lookaheadBuffer, input.detectedPeriod, result);
-		CHECK(result == 384);
-		auto [start4, center4, end4] = GranulatorTester::getWindowBounds(granulator, lookaheadBuffer, result, input.detectedPeriod);
+		currentAnalysisMarkIndex = GranulatorTester::getNextAnalysisMarkIndex(granulator, lookaheadBuffer, input.detectedPeriod, currentAnalysisMarkIndex);
+		CHECK(currentAnalysisMarkIndex == 384);
+		currentSynthMarkIndex = GranulatorTester::getNextSynthMarkIndex(granulator, input.detectedPeriod, input.shiftedPeriod, currentSynthMarkIndex, currentAnalysisMarkIndex);
+		CHECK(currentSynthMarkIndex == 384);		
+		auto [start4, center4, end4] = GranulatorTester::getWindowBounds(granulator, lookaheadBuffer, currentAnalysisMarkIndex, input.detectedPeriod);
 		CHECK(start4 == 256);
 		CHECK(center4 == 384);
 		CHECK(end4 == 511);
 
-		result = GranulatorTester::getNextAnalysisMarkIndex(granulator, lookaheadBuffer, input.detectedPeriod, result);
-		CHECK(result == 512);
-		auto [start5, center5, end5] = GranulatorTester::getWindowBounds(granulator, lookaheadBuffer, result, input.detectedPeriod);
+		currentAnalysisMarkIndex = GranulatorTester::getNextAnalysisMarkIndex(granulator, lookaheadBuffer, input.detectedPeriod, currentAnalysisMarkIndex);
+		CHECK(currentAnalysisMarkIndex == 512);
+		currentSynthMarkIndex = GranulatorTester::getNextSynthMarkIndex(granulator, input.detectedPeriod, input.shiftedPeriod, currentSynthMarkIndex, currentAnalysisMarkIndex);
+		CHECK(currentSynthMarkIndex == 512);		
+		auto [start5, center5, end5] = GranulatorTester::getWindowBounds(granulator, lookaheadBuffer, currentAnalysisMarkIndex, input.detectedPeriod);
 		CHECK(start5 == 384);
 		CHECK(center5 == 512);
 		CHECK(end5 == 639);
 
-		result = GranulatorTester::getNextAnalysisMarkIndex(granulator, lookaheadBuffer, input.detectedPeriod, result);
-		CHECK(result == 640);
-		auto [start6, center6, end6] = GranulatorTester::getWindowBounds(granulator, lookaheadBuffer, result, input.detectedPeriod);
+		currentAnalysisMarkIndex = GranulatorTester::getNextAnalysisMarkIndex(granulator, lookaheadBuffer, input.detectedPeriod, currentAnalysisMarkIndex);
+		CHECK(currentAnalysisMarkIndex == 640);
+		currentSynthMarkIndex = GranulatorTester::getNextSynthMarkIndex(granulator, input.detectedPeriod, input.shiftedPeriod, currentSynthMarkIndex, currentAnalysisMarkIndex);
+		CHECK(currentSynthMarkIndex == 640);		
+		auto [start6, center6, end6] = GranulatorTester::getWindowBounds(granulator, lookaheadBuffer, currentAnalysisMarkIndex, input.detectedPeriod);
 		CHECK(start6 == 512);
 		CHECK(center6 == 640);
 		CHECK(end6 == 767);
 
-		result = GranulatorTester::getNextAnalysisMarkIndex(granulator, lookaheadBuffer, input.detectedPeriod, result);
-		CHECK(result == 768);
-		auto [start7, center7, end7] = GranulatorTester::getWindowBounds(granulator, lookaheadBuffer, result, input.detectedPeriod);
+		currentAnalysisMarkIndex = GranulatorTester::getNextAnalysisMarkIndex(granulator, lookaheadBuffer, input.detectedPeriod, currentAnalysisMarkIndex);
+		CHECK(currentAnalysisMarkIndex == 768);
+		currentSynthMarkIndex = GranulatorTester::getNextSynthMarkIndex(granulator, input.detectedPeriod, input.shiftedPeriod, currentSynthMarkIndex, currentAnalysisMarkIndex);
+		CHECK(currentSynthMarkIndex == 768);		
+		auto [start7, center7, end7] = GranulatorTester::getWindowBounds(granulator, lookaheadBuffer, currentAnalysisMarkIndex, input.detectedPeriod);
 		CHECK(start7 == 640);
 		CHECK(center7 == 768);
 		CHECK(end7 == 895);
 
-		result = GranulatorTester::getNextAnalysisMarkIndex(granulator, lookaheadBuffer, input.detectedPeriod, result);
-		CHECK(result == 896);
-		auto [start8, center8, end8] = GranulatorTester::getWindowBounds(granulator, lookaheadBuffer, result, input.detectedPeriod);
+		currentAnalysisMarkIndex = GranulatorTester::getNextAnalysisMarkIndex(granulator, lookaheadBuffer, input.detectedPeriod, currentAnalysisMarkIndex);
+		CHECK(currentAnalysisMarkIndex == 896);
+		currentSynthMarkIndex = GranulatorTester::getNextSynthMarkIndex(granulator, input.detectedPeriod, input.shiftedPeriod, currentSynthMarkIndex, currentAnalysisMarkIndex);
+		CHECK(currentSynthMarkIndex == 896);		
+		auto [start8, center8, end8] = GranulatorTester::getWindowBounds(granulator, lookaheadBuffer, currentAnalysisMarkIndex, input.detectedPeriod);
 		CHECK(start8 == 768);
 		CHECK(center8 == 896);
 		CHECK(end8 == 1023);
 
-		result = GranulatorTester::getNextAnalysisMarkIndex(granulator, lookaheadBuffer, input.detectedPeriod, result);
-		CHECK(result == 0);
-		auto [start9, center9, end9] = GranulatorTester::getWindowBounds(granulator, lookaheadBuffer, result, input.detectedPeriod);
+		currentAnalysisMarkIndex = GranulatorTester::getNextAnalysisMarkIndex(granulator, lookaheadBuffer, input.detectedPeriod, currentAnalysisMarkIndex);
+		CHECK(currentAnalysisMarkIndex == 0);
+		currentSynthMarkIndex = GranulatorTester::getNextSynthMarkIndex(granulator, input.detectedPeriod, input.shiftedPeriod, currentSynthMarkIndex, currentAnalysisMarkIndex);
+		CHECK(currentSynthMarkIndex == 0);		
+		auto [start9, center9, end9] = GranulatorTester::getWindowBounds(granulator, lookaheadBuffer, currentAnalysisMarkIndex, input.detectedPeriod);
 		CHECK(start9 == -128);
 		CHECK(center9 == 0);
 		CHECK(end9 == 127);
 	}
 
-	SECTION("getWindowCenterIndex returns expected index")
+	SECTION("shifting up starting at [0]")
 	{
-		// TODO: Set up test conditions
-		// int analysisMarkIndex = ...;
-		// int result = GranulatorTester::getWindowCenterIndex(granulator, lookaheadBuffer, analysisMarkIndex, input.detectedPeriod);
-		// CHECK(result == expectedValue);
+		input.shiftedPeriod = 96.f; // shorter period = pitch up
+		int currentAnalysisMarkIndex = -1;
+		int currentSynthMarkIndex = -1;
+
+		currentAnalysisMarkIndex = GranulatorTester::getNextAnalysisMarkIndex(granulator, lookaheadBuffer, input.detectedPeriod, -1);
+		CHECK(currentAnalysisMarkIndex == 0);
+		currentSynthMarkIndex = GranulatorTester::getNextSynthMarkIndex(granulator, input.detectedPeriod, input.shiftedPeriod, currentSynthMarkIndex, currentAnalysisMarkIndex);
+		CHECK(currentSynthMarkIndex == 0);
+		auto [start1, center1, end1] = GranulatorTester::getWindowBounds(granulator, lookaheadBuffer, currentAnalysisMarkIndex, input.detectedPeriod);
+		CHECK(start1 == -128);
+		CHECK(center1 == 0);
+		CHECK(end1 == 127);
+
+		currentAnalysisMarkIndex = GranulatorTester::getNextAnalysisMarkIndex(granulator, lookaheadBuffer, input.detectedPeriod, currentAnalysisMarkIndex);
+		CHECK(currentAnalysisMarkIndex == 128);
+		currentSynthMarkIndex = GranulatorTester::getNextSynthMarkIndex(granulator, input.detectedPeriod, input.shiftedPeriod, currentSynthMarkIndex, currentAnalysisMarkIndex);
+		CHECK(currentSynthMarkIndex == 96);
+		auto [start2, center2, end2] = GranulatorTester::getWindowBounds(granulator, lookaheadBuffer, currentAnalysisMarkIndex, input.detectedPeriod);
+		CHECK(start2 == 0);
+		CHECK(center2 == 128);
+		CHECK(end2 == 255);
+
+		currentAnalysisMarkIndex = GranulatorTester::getNextAnalysisMarkIndex(granulator, lookaheadBuffer, input.detectedPeriod, currentAnalysisMarkIndex);
+		CHECK(currentAnalysisMarkIndex == 256);
+		currentSynthMarkIndex = GranulatorTester::getNextSynthMarkIndex(granulator, input.detectedPeriod, input.shiftedPeriod, currentSynthMarkIndex, currentAnalysisMarkIndex);
+		CHECK(currentSynthMarkIndex == 192);
+		auto [start3, center3, end3] = GranulatorTester::getWindowBounds(granulator, lookaheadBuffer, currentAnalysisMarkIndex, input.detectedPeriod);
+		CHECK(start3 == 128);
+		CHECK(center3 == 256);
+		CHECK(end3 == 383);
+
+		currentAnalysisMarkIndex = GranulatorTester::getNextAnalysisMarkIndex(granulator, lookaheadBuffer, input.detectedPeriod, currentAnalysisMarkIndex);
+		CHECK(currentAnalysisMarkIndex == 384);
+		currentSynthMarkIndex = GranulatorTester::getNextSynthMarkIndex(granulator, input.detectedPeriod, input.shiftedPeriod, currentSynthMarkIndex, currentAnalysisMarkIndex);
+		CHECK(currentSynthMarkIndex == 288);
+		auto [start4, center4, end4] = GranulatorTester::getWindowBounds(granulator, lookaheadBuffer, currentAnalysisMarkIndex, input.detectedPeriod);
+		CHECK(start4 == 256);
+		CHECK(center4 == 384);
+		CHECK(end4 == 511);
+
+		currentAnalysisMarkIndex = GranulatorTester::getNextAnalysisMarkIndex(granulator, lookaheadBuffer, input.detectedPeriod, currentAnalysisMarkIndex);
+		CHECK(currentAnalysisMarkIndex == 512);
+		currentSynthMarkIndex = GranulatorTester::getNextSynthMarkIndex(granulator, input.detectedPeriod, input.shiftedPeriod, currentSynthMarkIndex, currentAnalysisMarkIndex);
+		CHECK(currentSynthMarkIndex == 384);
+		auto [start5, center5, end5] = GranulatorTester::getWindowBounds(granulator, lookaheadBuffer, currentAnalysisMarkIndex, input.detectedPeriod);
+		CHECK(start5 == 384);
+		CHECK(center5 == 512);
+		CHECK(end5 == 639);
+
+		currentAnalysisMarkIndex = GranulatorTester::getNextAnalysisMarkIndex(granulator, lookaheadBuffer, input.detectedPeriod, currentAnalysisMarkIndex);
+		CHECK(currentAnalysisMarkIndex == 640);
+		currentSynthMarkIndex = GranulatorTester::getNextSynthMarkIndex(granulator, input.detectedPeriod, input.shiftedPeriod, currentSynthMarkIndex, currentAnalysisMarkIndex);
+		CHECK(currentSynthMarkIndex == 480);
+		auto [start6, center6, end6] = GranulatorTester::getWindowBounds(granulator, lookaheadBuffer, currentAnalysisMarkIndex, input.detectedPeriod);
+		CHECK(start6 == 512);
+		CHECK(center6 == 640);
+		CHECK(end6 == 767);
+
+		currentAnalysisMarkIndex = GranulatorTester::getNextAnalysisMarkIndex(granulator, lookaheadBuffer, input.detectedPeriod, currentAnalysisMarkIndex);
+		CHECK(currentAnalysisMarkIndex == 768);
+		currentSynthMarkIndex = GranulatorTester::getNextSynthMarkIndex(granulator, input.detectedPeriod, input.shiftedPeriod, currentSynthMarkIndex, currentAnalysisMarkIndex);
+		CHECK(currentSynthMarkIndex == 576);
+		auto [start7, center7, end7] = GranulatorTester::getWindowBounds(granulator, lookaheadBuffer, currentAnalysisMarkIndex, input.detectedPeriod);
+		CHECK(start7 == 640);
+		CHECK(center7 == 768);
+		CHECK(end7 == 895);
+
+		currentAnalysisMarkIndex = GranulatorTester::getNextAnalysisMarkIndex(granulator, lookaheadBuffer, input.detectedPeriod, currentAnalysisMarkIndex);
+		CHECK(currentAnalysisMarkIndex == 896);
+		currentSynthMarkIndex = GranulatorTester::getNextSynthMarkIndex(granulator, input.detectedPeriod, input.shiftedPeriod, currentSynthMarkIndex, currentAnalysisMarkIndex);
+		CHECK(currentSynthMarkIndex == 672);
+		auto [start8, center8, end8] = GranulatorTester::getWindowBounds(granulator, lookaheadBuffer, currentAnalysisMarkIndex, input.detectedPeriod);
+		CHECK(start8 == 768);
+		CHECK(center8 == 896);
+		CHECK(end8 == 1023);
+
+		currentAnalysisMarkIndex = GranulatorTester::getNextAnalysisMarkIndex(granulator, lookaheadBuffer, input.detectedPeriod, currentAnalysisMarkIndex);
+		CHECK(currentAnalysisMarkIndex == 0);
+		currentSynthMarkIndex = GranulatorTester::getNextSynthMarkIndex(granulator, input.detectedPeriod, input.shiftedPeriod, currentSynthMarkIndex, currentAnalysisMarkIndex);
+		CHECK(currentSynthMarkIndex == 768);
+		auto [start9, center9, end9] = GranulatorTester::getWindowBounds(granulator, lookaheadBuffer, currentAnalysisMarkIndex, input.detectedPeriod);
+		CHECK(start9 == -128);
+		CHECK(center9 == 0);
+		CHECK(end9 == 127);
 	}
 
-	SECTION("getNextSynthMarkIndex returns expected index")
+	SECTION("shifting down starting at [0]")
 	{
-		// TODO: Set up test conditions
-		// int currentSynthMarkIndex = ...;
-		// int currentAnalysisMarkIndex = ...;
-		// int result = GranulatorTester::getNextSynthMarkIndex(granulator, input.detectedPeriod, input.shiftedPeriod, currentSynthMarkIndex, currentAnalysisMarkIndex);
-		// CHECK(result == expectedValue);
+		input.shiftedPeriod = 160.f; // longer period = pitch down
+		int currentAnalysisMarkIndex = -1;
+		int currentSynthMarkIndex = -1;
+
+		currentAnalysisMarkIndex = GranulatorTester::getNextAnalysisMarkIndex(granulator, lookaheadBuffer, input.detectedPeriod, -1);
+		CHECK(currentAnalysisMarkIndex == 0);
+		currentSynthMarkIndex = GranulatorTester::getNextSynthMarkIndex(granulator, input.detectedPeriod, input.shiftedPeriod, currentSynthMarkIndex, currentAnalysisMarkIndex);
+		CHECK(currentSynthMarkIndex == 0);
+		auto [start1, center1, end1] = GranulatorTester::getWindowBounds(granulator, lookaheadBuffer, currentAnalysisMarkIndex, input.detectedPeriod);
+		CHECK(start1 == -128);
+		CHECK(center1 == 0);
+		CHECK(end1 == 127);
+
+		currentAnalysisMarkIndex = GranulatorTester::getNextAnalysisMarkIndex(granulator, lookaheadBuffer, input.detectedPeriod, currentAnalysisMarkIndex);
+		CHECK(currentAnalysisMarkIndex == 128);
+		currentSynthMarkIndex = GranulatorTester::getNextSynthMarkIndex(granulator, input.detectedPeriod, input.shiftedPeriod, currentSynthMarkIndex, currentAnalysisMarkIndex);
+		CHECK(currentSynthMarkIndex == 160);
+		auto [start2, center2, end2] = GranulatorTester::getWindowBounds(granulator, lookaheadBuffer, currentAnalysisMarkIndex, input.detectedPeriod);
+		CHECK(start2 == 0);
+		CHECK(center2 == 128);
+		CHECK(end2 == 255);
+
+		currentAnalysisMarkIndex = GranulatorTester::getNextAnalysisMarkIndex(granulator, lookaheadBuffer, input.detectedPeriod, currentAnalysisMarkIndex);
+		CHECK(currentAnalysisMarkIndex == 256);
+		currentSynthMarkIndex = GranulatorTester::getNextSynthMarkIndex(granulator, input.detectedPeriod, input.shiftedPeriod, currentSynthMarkIndex, currentAnalysisMarkIndex);
+		CHECK(currentSynthMarkIndex == 320);
+		auto [start3, center3, end3] = GranulatorTester::getWindowBounds(granulator, lookaheadBuffer, currentAnalysisMarkIndex, input.detectedPeriod);
+		CHECK(start3 == 128);
+		CHECK(center3 == 256);
+		CHECK(end3 == 383);
+
+		currentAnalysisMarkIndex = GranulatorTester::getNextAnalysisMarkIndex(granulator, lookaheadBuffer, input.detectedPeriod, currentAnalysisMarkIndex);
+		CHECK(currentAnalysisMarkIndex == 384);
+		currentSynthMarkIndex = GranulatorTester::getNextSynthMarkIndex(granulator, input.detectedPeriod, input.shiftedPeriod, currentSynthMarkIndex, currentAnalysisMarkIndex);
+		CHECK(currentSynthMarkIndex == 480);
+		auto [start4, center4, end4] = GranulatorTester::getWindowBounds(granulator, lookaheadBuffer, currentAnalysisMarkIndex, input.detectedPeriod);
+		CHECK(start4 == 256);
+		CHECK(center4 == 384);
+		CHECK(end4 == 511);
+
+		currentAnalysisMarkIndex = GranulatorTester::getNextAnalysisMarkIndex(granulator, lookaheadBuffer, input.detectedPeriod, currentAnalysisMarkIndex);
+		CHECK(currentAnalysisMarkIndex == 512);
+		currentSynthMarkIndex = GranulatorTester::getNextSynthMarkIndex(granulator, input.detectedPeriod, input.shiftedPeriod, currentSynthMarkIndex, currentAnalysisMarkIndex);
+		CHECK(currentSynthMarkIndex == 640);
+		auto [start5, center5, end5] = GranulatorTester::getWindowBounds(granulator, lookaheadBuffer, currentAnalysisMarkIndex, input.detectedPeriod);
+		CHECK(start5 == 384);
+		CHECK(center5 == 512);
+		CHECK(end5 == 639);
+
+		currentAnalysisMarkIndex = GranulatorTester::getNextAnalysisMarkIndex(granulator, lookaheadBuffer, input.detectedPeriod, currentAnalysisMarkIndex);
+		CHECK(currentAnalysisMarkIndex == 640);
+		currentSynthMarkIndex = GranulatorTester::getNextSynthMarkIndex(granulator, input.detectedPeriod, input.shiftedPeriod, currentSynthMarkIndex, currentAnalysisMarkIndex);
+		CHECK(currentSynthMarkIndex == 800);
+		auto [start6, center6, end6] = GranulatorTester::getWindowBounds(granulator, lookaheadBuffer, currentAnalysisMarkIndex, input.detectedPeriod);
+		CHECK(start6 == 512);
+		CHECK(center6 == 640);
+		CHECK(end6 == 767);
+
+		currentAnalysisMarkIndex = GranulatorTester::getNextAnalysisMarkIndex(granulator, lookaheadBuffer, input.detectedPeriod, currentAnalysisMarkIndex);
+		CHECK(currentAnalysisMarkIndex == 768);
+		currentSynthMarkIndex = GranulatorTester::getNextSynthMarkIndex(granulator, input.detectedPeriod, input.shiftedPeriod, currentSynthMarkIndex, currentAnalysisMarkIndex);
+		CHECK(currentSynthMarkIndex == 960);
+		auto [start7, center7, end7] = GranulatorTester::getWindowBounds(granulator, lookaheadBuffer, currentAnalysisMarkIndex, input.detectedPeriod);
+		CHECK(start7 == 640);
+		CHECK(center7 == 768);
+		CHECK(end7 == 895);
+
+		currentAnalysisMarkIndex = GranulatorTester::getNextAnalysisMarkIndex(granulator, lookaheadBuffer, input.detectedPeriod, currentAnalysisMarkIndex);
+		CHECK(currentAnalysisMarkIndex == 896);
+		currentSynthMarkIndex = GranulatorTester::getNextSynthMarkIndex(granulator, input.detectedPeriod, input.shiftedPeriod, currentSynthMarkIndex, currentAnalysisMarkIndex);
+		CHECK(currentSynthMarkIndex == 1120); // raw
+		int wrappedSynthMarkIndex = GranulatorTester::getWrappedSynthMarkIndex(granulator, lookaheadBuffer, currentSynthMarkIndex);
+		CHECK(wrappedSynthMarkIndex == 96); // wrapped
+		auto [start8, center8, end8] = GranulatorTester::getWindowBounds(granulator, lookaheadBuffer, currentAnalysisMarkIndex, input.detectedPeriod);
+		CHECK(start8 == 768);
+		CHECK(center8 == 896);
+		CHECK(end8 == 1023);
+
+		currentAnalysisMarkIndex = GranulatorTester::getNextAnalysisMarkIndex(granulator, lookaheadBuffer, input.detectedPeriod, currentAnalysisMarkIndex);
+		CHECK(currentAnalysisMarkIndex == 0);
+		currentSynthMarkIndex = GranulatorTester::getNextSynthMarkIndex(granulator, input.detectedPeriod, input.shiftedPeriod, currentSynthMarkIndex, currentAnalysisMarkIndex);
+		CHECK(currentSynthMarkIndex == 1280); // raw
+		wrappedSynthMarkIndex = GranulatorTester::getWrappedSynthMarkIndex(granulator, lookaheadBuffer, currentSynthMarkIndex);
+		CHECK(wrappedSynthMarkIndex == 256); // wrapped
+		auto [start9, center9, end9] = GranulatorTester::getWindowBounds(granulator, lookaheadBuffer, currentAnalysisMarkIndex, input.detectedPeriod);
+		CHECK(start9 == -128);
+		CHECK(center9 == 0);
+		CHECK(end9 == 127);
 	}
 }
 
