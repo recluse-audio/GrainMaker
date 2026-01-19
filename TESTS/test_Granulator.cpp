@@ -16,22 +16,50 @@
 class GranulatorTester
 {
 public:
-	static int getActiveGrainBuffer(Granulator& granulator)
+	// Buffer state index accessors
+	static int getReadingBufferIndex(Granulator& granulator)
 	{
-		return granulator.mActiveGrainBufferIndex;
+		return granulator.mReadingBufferIndex;
 	}
 
-	static bool getNeedToFillActive(Granulator& granulator)
+	static int getWritingBufferIndex(Granulator& granulator)
 	{
-		return granulator.mNeedToFillActive;
+		return granulator.mWritingBufferIndex;
 	}
 
+	static int getSpilloverBufferIndex(Granulator& granulator)
+	{
+		return granulator.mSpilloverBufferIndex;
+	}
+
+	static bool getNeedToFillReading(Granulator& granulator)
+	{
+		return granulator.mNeedToFillReading;
+	}
+
+	// Direct buffer access by index
 	static juce::AudioBuffer<float>& getGrainBuffer(Granulator& granulator, int index)
 	{
 		return granulator.mGrainBuffers[index];
 	}
 
-	// Convenience accessors for backward compatibility with existing tests
+	// Buffer access by state
+	static juce::AudioBuffer<float>& getReadingBuffer(Granulator& granulator)
+	{
+		return granulator._getReadingBuffer();
+	}
+
+	static juce::AudioBuffer<float>& getWritingBuffer(Granulator& granulator)
+	{
+		return granulator._getWritingBuffer();
+	}
+
+	static juce::AudioBuffer<float>& getSpilloverBuffer(Granulator& granulator)
+	{
+		return granulator._getSpilloverBuffer();
+	}
+
+	// Legacy accessors for backward compatibility
 	static juce::AudioBuffer<float>& getGrainBuffer1(Granulator& granulator)
 	{
 		return granulator.mGrainBuffers[0];
@@ -40,6 +68,11 @@ public:
 	static juce::AudioBuffer<float>& getGrainBuffer2(Granulator& granulator)
 	{
 		return granulator.mGrainBuffers[1];
+	}
+
+	static juce::AudioBuffer<float>& getGrainBuffer3(Granulator& granulator)
+	{
+		return granulator.mGrainBuffers[2];
 	}
 
 	static int getNumGrainBuffers(Granulator& granulator)
@@ -57,7 +90,6 @@ public:
 		return *granulator.mWindow.get();
 	}
 
-
 	static juce::int64 getGrainReadPos(Granulator& granulator)
 	{
 		return granulator.mGrainReadPos;
@@ -68,9 +100,11 @@ public:
 		return granulator.mProcessBlockWritePos;
 	}
 
-	static void granulateToGrainBuffer(Granulator& granulator, juce::AudioBuffer<float>& lookahead, juce::AudioBuffer<float>& grainBuffer, float detectedPeriod, float shiftedPeriod)
+	static void granulateToGrainBuffer(Granulator& granulator, juce::AudioBuffer<float>& lookahead,
+									   juce::AudioBuffer<float>& grainBuffer, juce::AudioBuffer<float>& spilloverBuffer,
+									   float detectedPeriod, float shiftedPeriod)
 	{
-		granulator._granulateToGrainBuffer(lookahead, grainBuffer, detectedPeriod, shiftedPeriod);
+		granulator._granulateToGrainBuffer(lookahead, grainBuffer, spilloverBuffer, detectedPeriod, shiftedPeriod);
 	}
 };
 
@@ -163,23 +197,27 @@ TEST_CASE("Granulator prepare() initializes correctly", "[Granulator][prepare]")
 
 	SECTION("Grain buffers are sized correctly")
 	{
-		// Check that both grain buffers have the correct size
+		// Check that all three grain buffers have the correct size
 		CHECK(GranulatorTester::getGrainBuffer1(granulator).getNumSamples() == testLookaheadSize);
 		CHECK(GranulatorTester::getGrainBuffer2(granulator).getNumSamples() == testLookaheadSize);
+		CHECK(GranulatorTester::getGrainBuffer3(granulator).getNumSamples() == testLookaheadSize);
 
 		// Check they are stereo (2 channels)
 		CHECK(GranulatorTester::getGrainBuffer1(granulator).getNumChannels() == 2);
 		CHECK(GranulatorTester::getGrainBuffer2(granulator).getNumChannels() == 2);
+		CHECK(GranulatorTester::getGrainBuffer3(granulator).getNumChannels() == 2);
 	}
 
-	SECTION("Active grain buffer is initialized to 0")
+	SECTION("Buffer state indices are initialized correctly")
 	{
-		CHECK(GranulatorTester::getActiveGrainBuffer(granulator) == 0);
+		CHECK(GranulatorTester::getReadingBufferIndex(granulator) == 0);
+		CHECK(GranulatorTester::getWritingBufferIndex(granulator) == 1);
+		CHECK(GranulatorTester::getSpilloverBufferIndex(granulator) == 2);
 	}
 
-	SECTION("mNeedToFillActive is set to true")
+	SECTION("mNeedToFillReading is set to true")
 	{
-		CHECK(GranulatorTester::getNeedToFillActive(granulator) == true);
+		CHECK(GranulatorTester::getNeedToFillReading(granulator) == true);
 	}
 
 	SECTION("Window is configured correctly")
@@ -214,7 +252,7 @@ TEST_CASE("Granulator prepare() initializes correctly", "[Granulator][prepare]")
 //==============================================================================
 //==============================================================================
 
-TEST_CASE("Granulator first call to granulate() flips mNeedToFillActive as expected", "[Granulator][granulate]")
+TEST_CASE("Granulator first call to granulate() flips mNeedToFillReading as expected", "[Granulator][granulate]")
 {
 	TestUtils::SetupAndTeardown setupAndTeardown;
 
@@ -224,20 +262,20 @@ TEST_CASE("Granulator first call to granulate() flips mNeedToFillActive as expec
 	// Call prepare
 	granulator.prepare(input.testSampleRate, input.testBlockSize, input.testLookaheadSize);
 
-	// Verify mNeedToFillActive is true before first granulate call
-	CHECK(GranulatorTester::getNeedToFillActive(granulator) == true);
+	// Verify mNeedToFillReading is true before first granulate call
+	CHECK(GranulatorTester::getNeedToFillReading(granulator) == true);
 
-	// First call to granulate should flip mNeedToFillActive to false
+	// First call to granulate should flip mNeedToFillReading to false
 	granulator.granulate(input.lookaheadBuffer, input.processBuffer, input.detectedPeriod, input.shiftedPeriod);
 
-	// Verify mNeedToFillActive is now false after first granulate call
-	CHECK(GranulatorTester::getNeedToFillActive(granulator) == false);
+	// Verify mNeedToFillReading is now false after first granulate call
+	CHECK(GranulatorTester::getNeedToFillReading(granulator) == false);
 
 	// Call prepare again
 	granulator.prepare(input.testSampleRate, input.testBlockSize, input.testLookaheadSize);
 
-	// Verify mNeedToFillActive is true before first granulate call
-	CHECK(GranulatorTester::getNeedToFillActive(granulator) == true);
+	// Verify mNeedToFillReading is true before first granulate call
+	CHECK(GranulatorTester::getNeedToFillReading(granulator) == true);
 }
 
 
@@ -328,8 +366,9 @@ TEST_CASE("Read/write pos related to lookahead/grainBuffers/processBlock all add
 	Window& window = GranulatorTester::getWindow(granulator);
 	window.setShape(Window::Shape::kNone);
 
-	// Call private function in Granulator
-	GranulatorTester::granulateToGrainBuffer(granulator, input.lookaheadBuffer, grainBuffer1, input.detectedPeriod, input.shiftedPeriod);
+	// Call private function in Granulator (grainBuffer1 = reading, grainBuffer2 = spillover)
+	juce::AudioBuffer<float>& spilloverBuffer = GranulatorTester::getGrainBuffer2(granulator);
+	GranulatorTester::granulateToGrainBuffer(granulator, input.lookaheadBuffer, grainBuffer1, spilloverBuffer, input.detectedPeriod, input.shiftedPeriod);
 
 	int numSamples  = GranulatorTester::getGrainBuffer1(granulator).getNumSamples();
 	int numChannels = GranulatorTester::getGrainBuffer1(granulator).getNumChannels();
@@ -465,6 +504,7 @@ TEST_CASE("Testing '_granulateToGrainBuffer()' - how grainBuffers are filled fro
 	window.setShape(Window::Shape::kNone);
 
 	juce::AudioBuffer<float>& grainBuffer1 = GranulatorTester::getGrainBuffer1(granulator);
+	juce::AudioBuffer<float>& spilloverBuffer = GranulatorTester::getGrainBuffer2(granulator);
 	int numChannels = grainBuffer1.getNumChannels();
 
 	SECTION("No shifting, grains of size 256 (2x period of 128) are positioned accordingly.")
@@ -472,7 +512,7 @@ TEST_CASE("Testing '_granulateToGrainBuffer()' - how grainBuffers are filled fro
 		input.detectedPeriod = 128.f;
 		input.shiftedPeriod = 128.f; // no shifting
 
-		GranulatorTester::granulateToGrainBuffer(granulator, input.lookaheadBuffer, grainBuffer1,
+		GranulatorTester::granulateToGrainBuffer(granulator, input.lookaheadBuffer, grainBuffer1, spilloverBuffer,
 												input.detectedPeriod, input.shiftedPeriod);
 
 		// GRAIN 1: [0-255] -> 1.f
