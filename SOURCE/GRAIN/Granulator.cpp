@@ -125,43 +125,88 @@ void Granulator::_granulateToGrainBuffer(juce::AudioBuffer<float>& bufferToGranu
 {
 	mWindow->setPeriod(static_cast<int>(detectedPeriod));
 
-	if(mCurrentAnalysisMarkIndex < 0)
-		mCurrentAnalysisMarkIndex = BufferHelper::getPeakIndex(bufferToGranulate, 0, (int)detectedPeriod);
-	else
-		mCurrentAnalysisMarkIndex = mCurrentAnalysisMarkIndex + (int)detectedPeriod;
 
-	int windowCenter = _getWindowCenterIndex(bufferToGranulate, mCurrentAnalysisMarkIndex, detectedPeriod);
 
-	juce::int64 readStartIndex = 0;
-	juce::int64 readEndIndex = static_cast<juce::int64>(detectedPeriod - 1.f);
-	juce::int64 writeStartIndex = 0;
-	juce::int64 writeEndIndex = static_cast<juce::int64>(detectedPeriod - 1.f);
-
-	while (readStartIndex < bufferToGranulate.getNumSamples() && writeStartIndex < grainBuffer.getNumSamples())
+	// we are concerned with the grains we need to write to the grainBuffer/spillover
+	// if shifting down we may not read all the lookahead.
+	// shifting up we have more synth indices than analysis
+	while (mCurrentSynthMarkIndex < grainBuffer.getNumSamples())
 	{
-		RD::BufferRange readRange; readRange.setStartIndex(readStartIndex); readRange.setEndIndex(readEndIndex);
-		RD::BufferRange writeRange; writeRange.setStartIndex(writeStartIndex); writeRange.setEndIndex(writeEndIndex);
+		mCurrentAnalysisMarkIndex = _getNextAnalysisMarkIndex(bufferToGranulate, detectedPeriod, mCurrentAnalysisMarkIndex);
+		mCurrentSynthMarkIndex = _getNextSynthMarkIndex(detectedPeriod, shiftedPeriod, mCurrentSynthMarkIndex, mCurrentAnalysisMarkIndex);
 
-		// Get the grain as an audio block from the source buffer
+		auto [analStart, analCenter, analEnd] = _getAnalysisBounds(bufferToGranulate, mCurrentAnalysisMarkIndex, detectedPeriod);
+		auto [synthStart, synthEnd] = _getSynthBounds(mCurrentSynthMarkIndex, detectedPeriod);
+
+		int sourceBufferSize = bufferToGranulate.getNumSamples();
+		int destBufferSize = grainBuffer.getNumSamples();
+
+		// Rectify analysis (read) bounds to valid source buffer range
+		int rectifiedAnalStart = analStart >= 0 ? analStart : 0;
+		int rectifiedAnalEnd = analEnd < sourceBufferSize ? analEnd : sourceBufferSize - 1;
+		int analStartClipOffset = rectifiedAnalStart - analStart;
+
+		// Rectify synth (write) bounds to valid dest buffer range
+		int rectifiedSynthStart = synthStart >= 0 ? synthStart : 0;
+		int rectifiedSynthEnd = synthEnd < destBufferSize ? synthEnd : destBufferSize - 1;
+		int synthStartClipOffset = rectifiedSynthStart - synthStart;
+
+		RD::BufferRange readRange;
+		readRange.setStartIndex(rectifiedAnalStart);
+		readRange.setEndIndex(rectifiedAnalEnd);
+
+		RD::BufferRange writeRange;
+		writeRange.setStartIndex(rectifiedSynthStart);
+		writeRange.setEndIndex(rectifiedSynthEnd);
+
+		// Get the grain as an audio block from the source buffer (rectified range only)
 		juce::dsp::AudioBlock<float> grainBlock = BufferHelper::getRangeAsBlock(bufferToGranulate, readRange);
 
-		// Applies window as you might guess
+		// Set window phase based on how much was clipped from analysis start
+		double phaseIncrement = (double)mWindow->getSize() / (double)mWindow->getPeriod();
+		double windowPhase = analStartClipOffset * phaseIncrement;
+		mWindow->setReadPos(windowPhase);
+
+		// Apply window starting at correct phase
 		BufferHelper::applyWindowToBlock(grainBlock, *mWindow.get());
 
-		// Write the grain block to the output buffer
-		BufferHelper::writeBlockToBuffer(grainBuffer, grainBlock, writeRange);
+		// Handle misaligned clipping between read and write ranges
+		// Sample at grainBlock[i] came from (analStart + analStartClipOffset + i)
+		// and should write to (synthStart + analStartClipOffset + i)
+		juce::dsp::AudioBlock<float> blockToWrite = grainBlock;
+		int blockOffset = 0;
+		int actualWriteStart = rectifiedSynthStart;
 
-		readStartIndex =  readEndIndex + (juce::int64) 1;
-		readEndIndex = readStartIndex + (juce::int64) (detectedPeriod - 1.f);
-		if(readEndIndex >= bufferToGranulate.getNumSamples())
-			readEndIndex = bufferToGranulate.getNumSamples() - 1;
+		if (synthStartClipOffset > analStartClipOffset)
+		{
+			// Synth clipped more at start - skip samples from grainBlock
+			blockOffset = synthStartClipOffset - analStartClipOffset;
+		}
+		else if (analStartClipOffset > synthStartClipOffset)
+		{
+			// Analysis clipped more at start - shift write position forward
+			actualWriteStart = rectifiedSynthStart + (analStartClipOffset - synthStartClipOffset);
+		}
 
-		writeStartIndex = writeStartIndex + (juce::int64) (shiftedPeriod);
-		writeEndIndex = writeStartIndex + (juce::int64) (detectedPeriod - 1.f);
-		if(writeEndIndex >= grainBuffer.getNumSamples())
-			writeEndIndex = grainBuffer.getNumSamples() - 1;
+		// Calculate how many samples we can actually write
+		int grainBlockSize = static_cast<int>(grainBlock.getNumSamples());
+		int availableSamples = grainBlockSize - blockOffset;
+		int writeSpaceAvailable = rectifiedSynthEnd - actualWriteStart + 1;
+		int samplesToWrite = std::min(availableSamples, writeSpaceAvailable);
 
+		if (samplesToWrite > 0 && blockOffset < grainBlockSize)
+		{
+			blockToWrite = grainBlock.getSubBlock(
+				static_cast<size_t>(blockOffset),
+				static_cast<size_t>(samplesToWrite)
+			);
 
+			writeRange.setStartIndex(actualWriteStart);
+			writeRange.setEndIndex(actualWriteStart + samplesToWrite - 1);
+
+			// Write the grain block to the output buffer
+			BufferHelper::writeBlockToBuffer(grainBuffer, blockToWrite, writeRange);
+		}
 	}
 }
 
@@ -188,6 +233,24 @@ int Granulator::_getNextAnalysisMarkIndex(juce::AudioBuffer<float>& lookaheadBuf
 }
 
 //==========================================
+std::tuple<int, int, int> Granulator::_getAnalysisBounds(juce::AudioBuffer<float>& buffer, int analysisMarkIndex, float detectedPeriod)
+{
+	int center = _getWindowCenterIndex(buffer, analysisMarkIndex, detectedPeriod);
+	int start = center - detectedPeriod;
+	int end = center + detectedPeriod - 1;
+	return {start, center, end};
+}
+
+//==========================================
+std::tuple<int, int> Granulator::_getSynthBounds(int synthMarkIndex, float detectedPeriod)
+{
+	int center = synthMarkIndex;
+	int start = center - detectedPeriod;
+	int end = center + detectedPeriod - 1;
+	return {start, end};
+}
+
+//==========================================
 int Granulator::_getWindowCenterIndex(juce::AudioBuffer<float>& buffer, int analysisMarkIndex, float detectedPeriod)
 {
 	int centerIndex = analysisMarkIndex;
@@ -198,14 +261,7 @@ int Granulator::_getWindowCenterIndex(juce::AudioBuffer<float>& buffer, int anal
 	return centerIndex;
 }
 
-//==========================================
-std::tuple<int, int, int> Granulator::_getWindowBounds(juce::AudioBuffer<float>& buffer, int analysisMarkIndex, float detectedPeriod)
-{
-	int center = _getWindowCenterIndex(buffer, analysisMarkIndex, detectedPeriod);
-	int start = center - detectedPeriod;
-	int end = center + detectedPeriod - 1;
-	return {start, center, end};
-}
+
 
 //==========================================
 int Granulator::_getNextSynthMarkIndex(float detectedPeriod, float shiftedPeriod,
@@ -222,6 +278,18 @@ int Granulator::_getNextSynthMarkIndex(float detectedPeriod, float shiftedPeriod
 	}
 
 	return nextSynthMarkIndex;
+}
+
+//==========================================
+int Granulator::_getWrappedSynthMarkIndex(juce::AudioBuffer<float>& buffer, int synthMarkIndex)
+{
+	int bufferSize = buffer.getNumSamples();
+	int wrappedIndex = synthMarkIndex;
+
+	if (wrappedIndex >= bufferSize)
+		wrappedIndex = wrappedIndex - bufferSize;
+
+	return wrappedIndex;
 }
 
 //=======================================
