@@ -37,12 +37,6 @@ public:
 		return granulator.mNeedToFillReading;
 	}
 
-	// Direct buffer access by index
-	static juce::AudioBuffer<float>& getGrainBuffer(Granulator& granulator, int index)
-	{
-		return granulator.mGrainBuffers[index];
-	}
-
 	// Buffer access by state
 	static juce::AudioBuffer<float>& getReadingBuffer(Granulator& granulator)
 	{
@@ -59,27 +53,24 @@ public:
 		return granulator._getSpilloverBuffer();
 	}
 
-	// Legacy accessors for backward compatibility
-	static juce::AudioBuffer<float>& getGrainBuffer1(Granulator& granulator)
+	// Get the specific buffer in the array of buffers by index regardless of state
+	static juce::AudioBuffer<float>& getBufferByIndex(Granulator& granulator, int index)
 	{
-		return granulator.mGrainBuffers[0];
+		// keep in bounds
+		if(index < 0 )
+			index = 0;
+		if((size_t)index >= granulator.mGrainBuffers.size())
+			index = granulator.mGrainBuffers.size() - 1;
+
+		return granulator.mGrainBuffers[index];
 	}
 
-	static juce::AudioBuffer<float>& getGrainBuffer2(Granulator& granulator)
-	{
-		return granulator.mGrainBuffers[1];
-	}
-
-	static juce::AudioBuffer<float>& getGrainBuffer3(Granulator& granulator)
-	{
-		return granulator.mGrainBuffers[2];
-	}
-
+	//
 	static int getNumGrainBuffers(Granulator& granulator)
 	{
 		return static_cast<int>(granulator.mGrainBuffers.size());
 	}
-
+	//
 	static int getProcessBlockSize(Granulator& granulator)
 	{
 		return granulator.mProcessBlockSize;
@@ -198,14 +189,14 @@ TEST_CASE("Granulator prepare() initializes correctly", "[Granulator][prepare]")
 	SECTION("Grain buffers are sized correctly")
 	{
 		// Check that all three grain buffers have the correct size
-		CHECK(GranulatorTester::getGrainBuffer1(granulator).getNumSamples() == testLookaheadSize);
-		CHECK(GranulatorTester::getGrainBuffer2(granulator).getNumSamples() == testLookaheadSize);
-		CHECK(GranulatorTester::getGrainBuffer3(granulator).getNumSamples() == testLookaheadSize);
+		CHECK(GranulatorTester::getReadingBuffer(granulator).getNumSamples() == testLookaheadSize);
+		CHECK(GranulatorTester::getWritingBuffer(granulator).getNumSamples() == testLookaheadSize);
+		CHECK(GranulatorTester::getSpilloverBuffer(granulator).getNumSamples() == testLookaheadSize);
 
 		// Check they are stereo (2 channels)
-		CHECK(GranulatorTester::getGrainBuffer1(granulator).getNumChannels() == 2);
-		CHECK(GranulatorTester::getGrainBuffer2(granulator).getNumChannels() == 2);
-		CHECK(GranulatorTester::getGrainBuffer3(granulator).getNumChannels() == 2);
+		CHECK(GranulatorTester::getReadingBuffer(granulator).getNumChannels() == 2);
+		CHECK(GranulatorTester::getWritingBuffer(granulator).getNumChannels() == 2);
+		CHECK(GranulatorTester::getSpilloverBuffer(granulator).getNumChannels() == 2);
 	}
 
 	SECTION("Buffer state indices are initialized correctly")
@@ -303,39 +294,68 @@ TEST_CASE("Granulator fills GrainBuffers appropriately", "[Granulator][grainBuff
 	Window& window = GranulatorTester::getWindow(granulator);
 	window.setShape(Window::Shape::kNone);
 
-	CHECK(BufferHelper::isSilent(GranulatorTester::getGrainBuffer1(granulator)) == true);
-	CHECK(BufferHelper::isSilent(GranulatorTester::getGrainBuffer2(granulator)) == true);
+	// Check that buffers are silent where they should be and 
+	// flags for grainBuffer indices are in expected starting config
+	CHECK(BufferHelper::isSilent(GranulatorTester::getReadingBuffer(granulator)) == true);
+	CHECK(BufferHelper::isSilent(GranulatorTester::getWritingBuffer(granulator)) == true);
+	CHECK(BufferHelper::isSilent(GranulatorTester::getSpilloverBuffer(granulator)) == true);
+	CHECK(GranulatorTester::getReadingBufferIndex(granulator) == 0);
+	CHECK(GranulatorTester::getWritingBufferIndex(granulator) == 1);
+	CHECK(GranulatorTester::getSpilloverBufferIndex(granulator) == 2);
 
-	// granulate one processBuffer, 
-	// grainBuffer1 is filled with entire input.lookaheadBuffer
-	// grainBuffer2 is still all 0's
+	// GRANULATE #1 [0-255]
+	// Reading buffer is filled with entire input.lookaheadBuffer
+	// Writing and Spillover buffers are still all 0's
 	granulator.granulate(input.lookaheadBuffer, input.processBuffer, input.detectedPeriod, input.shiftedPeriod);
-	REQUIRE(BufferHelper::buffersAreIdentical(input.lookaheadBuffer, GranulatorTester::getGrainBuffer1(granulator)));
-	CHECK(BufferHelper::isSilent(GranulatorTester::getGrainBuffer1(granulator)) == false);
-	CHECK(BufferHelper::isSilent(GranulatorTester::getGrainBuffer2(granulator)) == true);
-
-	granulator.granulate(input.lookaheadBuffer, input.processBuffer, input.detectedPeriod, input.shiftedPeriod);
-	REQUIRE(BufferHelper::buffersAreIdentical(input.lookaheadBuffer, GranulatorTester::getGrainBuffer1(granulator)));
-	CHECK(BufferHelper::isSilent(GranulatorTester::getGrainBuffer1(granulator)) == false);
-	CHECK(BufferHelper::isSilent(GranulatorTester::getGrainBuffer2(granulator)) == true);
 	
-	granulator.granulate(input.lookaheadBuffer, input.processBuffer, input.detectedPeriod, input.shiftedPeriod);
-	REQUIRE(BufferHelper::buffersAreIdentical(input.lookaheadBuffer, GranulatorTester::getGrainBuffer1(granulator)));
-	CHECK(BufferHelper::isSilent(GranulatorTester::getGrainBuffer1(granulator)) == false);
-	CHECK(BufferHelper::isSilent(GranulatorTester::getGrainBuffer2(granulator)) == true);
+	// Check that flags for grainBuffer indices are still in expected starting config
+	CHECK(GranulatorTester::getReadingBufferIndex(granulator) == 0);
+	CHECK(GranulatorTester::getWritingBufferIndex(granulator) == 1);
+	CHECK(GranulatorTester::getSpilloverBufferIndex(granulator) == 2);
 
-	granulator.granulate(input.lookaheadBuffer, input.processBuffer, input.detectedPeriod, input.shiftedPeriod);
-	CHECK(BufferHelper::buffersAreIdentical(input.lookaheadBuffer, GranulatorTester::getGrainBuffer1(granulator)));
-	CHECK(BufferHelper::isSilent(GranulatorTester::getGrainBuffer1(granulator)) == false);
-	CHECK(BufferHelper::isSilent(GranulatorTester::getGrainBuffer2(granulator)) == true);
-	
-	// This is where grainBuffer2 is filled
-	granulator.granulate(input.lookaheadBuffer, input.processBuffer, input.detectedPeriod, input.shiftedPeriod);
-	CHECK(BufferHelper::buffersAreIdentical(input.lookaheadBuffer, GranulatorTester::getGrainBuffer1(granulator)));
-	CHECK(BufferHelper::isSilent(GranulatorTester::getGrainBuffer1(granulator)) == false);
-	CHECK(BufferHelper::isSilent(GranulatorTester::getGrainBuffer2(granulator)) == false);
-	
+	// double check that we are starting with index [0] as expected. mGrainBuffer[0] should be first read buffer
+	REQUIRE(BufferHelper::buffersAreIdentical(GranulatorTester::getBufferByIndex(granulator, 0), GranulatorTester::getReadingBuffer(granulator)));
+	CHECK(BufferHelper::isSilent(GranulatorTester::getReadingBuffer(granulator)) == false);
+	CHECK(BufferHelper::isSilent(GranulatorTester::getWritingBuffer(granulator)) == true);
 
+	// GRANULATE #2 [256-512]
+	granulator.granulate(input.lookaheadBuffer, input.processBuffer, input.detectedPeriod, input.shiftedPeriod);
+	REQUIRE(BufferHelper::buffersAreIdentical(GranulatorTester::getBufferByIndex(granulator, 0), GranulatorTester::getReadingBuffer(granulator)));
+	CHECK(BufferHelper::isSilent(GranulatorTester::getReadingBuffer(granulator)) == false);
+	CHECK(BufferHelper::isSilent(GranulatorTester::getWritingBuffer(granulator)) == true);
+	CHECK(GranulatorTester::getReadingBufferIndex(granulator) == 0);
+	CHECK(GranulatorTester::getWritingBufferIndex(granulator) == 1);
+	CHECK(GranulatorTester::getSpilloverBufferIndex(granulator) == 2);
+
+	// GRANULATE #3 [512-767]
+	granulator.granulate(input.lookaheadBuffer, input.processBuffer, input.detectedPeriod, input.shiftedPeriod);
+	REQUIRE(BufferHelper::buffersAreIdentical(GranulatorTester::getBufferByIndex(granulator, 0), GranulatorTester::getReadingBuffer(granulator)));
+	CHECK(BufferHelper::isSilent(GranulatorTester::getReadingBuffer(granulator)) == false);
+	CHECK(BufferHelper::isSilent(GranulatorTester::getWritingBuffer(granulator)) == true);
+	CHECK(GranulatorTester::getReadingBufferIndex(granulator) == 0);
+	CHECK(GranulatorTester::getWritingBufferIndex(granulator) == 1);
+	CHECK(GranulatorTester::getSpilloverBufferIndex(granulator) == 2);
+
+	// GRANLULATE #4 [768-1023]
+	granulator.granulate(input.lookaheadBuffer, input.processBuffer, input.detectedPeriod, input.shiftedPeriod);
+	REQUIRE(BufferHelper::buffersAreIdentical(GranulatorTester::getBufferByIndex(granulator, 0), GranulatorTester::getReadingBuffer(granulator)));
+	CHECK(BufferHelper::isSilent(GranulatorTester::getReadingBuffer(granulator)) == false);
+	CHECK(BufferHelper::isSilent(GranulatorTester::getWritingBuffer(granulator)) == true);
+	CHECK(GranulatorTester::getReadingBufferIndex(granulator) == 0);
+	CHECK(GranulatorTester::getWritingBufferIndex(granulator) == 1);
+	CHECK(GranulatorTester::getSpilloverBufferIndex(granulator) == 2);
+
+	// GRANULATE #5 --TRANSITION-- [1024-1280]
+	// at this point we should have switched to index 1 buffer and cleared index 0
+	granulator.granulate(input.lookaheadBuffer, input.processBuffer, input.detectedPeriod, input.shiftedPeriod);
+	REQUIRE(BufferHelper::buffersAreIdentical(GranulatorTester::getBufferByIndex(granulator, 1), GranulatorTester::getReadingBuffer(granulator)));
+	CHECK(BufferHelper::isSilent(GranulatorTester::getBufferByIndex(granulator, 0)) == true);
+	CHECK(BufferHelper::isSilent(GranulatorTester::getBufferByIndex(granulator, 1)) == false);
+	CHECK(BufferHelper::isSilent(GranulatorTester::getBufferByIndex(granulator, 2)) == true);
+	// Indices
+	CHECK(GranulatorTester::getReadingBufferIndex(granulator) == 1);
+	CHECK(GranulatorTester::getWritingBufferIndex(granulator) == 2);
+	CHECK(GranulatorTester::getSpilloverBufferIndex(granulator) == 0);
 
 }
 
@@ -354,30 +374,31 @@ TEST_CASE("Read/write pos related to lookahead/grainBuffers/processBlock all add
 	Granulator granulator;
 	MockProcessorInput input;
 
-	juce::AudioBuffer<float>& grainBuffer1 = GranulatorTester::getGrainBuffer1(granulator);
+	// Call prepare first so buffers exist
+	granulator.prepare(input.testSampleRate, input.testBlockSize, input.testLookaheadSize);
+
+	juce::AudioBuffer<float>& readingBuffer = GranulatorTester::getReadingBuffer(granulator);
 	juce::AudioBuffer<float>& lookaheadBuffer = input.lookaheadBuffer;
 	lookaheadBuffer.clear();
 	BufferFiller::fillIncremental(lookaheadBuffer);
 
-	// Call prepare
-	// Only want to test that all 1's buffer's are read from lookahead to grainBuffer in this test.
+	// Only want to test that incremental buffer values are read from lookahead to grainBuffer in this test.
 	// Need to remove windowing for high contrast. Window shape is set in prepare() by default.
-	granulator.prepare(input.testSampleRate, input.testBlockSize, input.testLookaheadSize);
 	Window& window = GranulatorTester::getWindow(granulator);
 	window.setShape(Window::Shape::kNone);
 
-	// Call private function in Granulator (grainBuffer1 = reading, grainBuffer2 = spillover)
-	juce::AudioBuffer<float>& spilloverBuffer = GranulatorTester::getGrainBuffer2(granulator);
-	GranulatorTester::granulateToGrainBuffer(granulator, input.lookaheadBuffer, grainBuffer1, spilloverBuffer, input.detectedPeriod, input.shiftedPeriod);
+	// Call private function in Granulator
+	juce::AudioBuffer<float>& spilloverBuffer = GranulatorTester::getSpilloverBuffer(granulator);
+	GranulatorTester::granulateToGrainBuffer(granulator, input.lookaheadBuffer, readingBuffer, spilloverBuffer, input.detectedPeriod, input.shiftedPeriod);
 
-	int numSamples  = GranulatorTester::getGrainBuffer1(granulator).getNumSamples();
-	int numChannels = GranulatorTester::getGrainBuffer1(granulator).getNumChannels();
+	int numSamples  = GranulatorTester::getReadingBuffer(granulator).getNumSamples();
+	int numChannels = GranulatorTester::getReadingBuffer(granulator).getNumChannels();
 
 	for (int sampleIndex = 0; sampleIndex < numSamples; ++sampleIndex)
 	{
 		for (int ch = 0; ch < numChannels; ++ch)
 		{
-			float grainSample = grainBuffer1.getSample(ch, sampleIndex);
+			float grainSample = readingBuffer.getSample(ch, sampleIndex);
 			CHECK(grainSample == (float)sampleIndex);
 		}
 	}
@@ -397,19 +418,18 @@ TEST_CASE("mGrainReadPos is incremented properly when writing to processBlock()"
 	Granulator granulator;
 	MockProcessorInput input;
 
-	juce::AudioBuffer<float>& grainBuffer1 = GranulatorTester::getGrainBuffer1(granulator);
 	juce::AudioBuffer<float>& lookaheadBuffer = input.lookaheadBuffer;
 	lookaheadBuffer.clear();
 	BufferFiller::fillIncremental(lookaheadBuffer);
 
 	// Call prepare
-	// Only want to test that all 1's buffer's are read from lookahead to grainBuffer in this test.
+	// Only want to test that incremental values are read from lookahead to grainBuffer in this test.
 	// Need to remove windowing for high contrast. Window shape is set in prepare() by default.
 	granulator.prepare(input.testSampleRate, input.testBlockSize, input.testLookaheadSize);
 	Window& window = GranulatorTester::getWindow(granulator);
 	window.setShape(Window::Shape::kNone);
 
-	// Call private function in Granulator
+	// Call granulate which fills reading buffer and writes to processBuffer
 	granulator.granulate(input.lookaheadBuffer, input.processBuffer, input.detectedPeriod, input.shiftedPeriod);
 
 	int numSamples  = input.processBuffer.getNumSamples();
@@ -425,7 +445,7 @@ TEST_CASE("mGrainReadPos is incremented properly when writing to processBlock()"
 		}
 	}
 
-	// at this point, we've should have taken 256 samples (process block size) of grainBuffer1 data [0-255]
+	// at this point, we've should have taken 256 samples (process block size) of reading buffer data [0-255]
 	// and written it to sample indices [0-255] of the processBuffer
 	CHECK(input.processBuffer.getNumSamples() == 256);
 }
@@ -464,8 +484,8 @@ TEST_CASE("Testing '' - how grainBuffers are filled from lookaheadBuffer", "[Gra
 	Window& window = GranulatorTester::getWindow(granulator);
 	window.setShape(Window::Shape::kNone);
 
-	juce::AudioBuffer<float>& grainBuffer1 = GranulatorTester::getGrainBuffer1(granulator);
-	int numChannels = grainBuffer1.getNumChannels();
+	juce::AudioBuffer<float>& readingBuffer = GranulatorTester::getReadingBuffer(granulator);
+	int numChannels = readingBuffer.getNumChannels();
 
 
 }
@@ -503,37 +523,37 @@ TEST_CASE("Testing '_granulateToGrainBuffer()' - how grainBuffers are filled fro
 	Window& window = GranulatorTester::getWindow(granulator);
 	window.setShape(Window::Shape::kNone);
 
-	juce::AudioBuffer<float>& grainBuffer1 = GranulatorTester::getGrainBuffer1(granulator);
-	juce::AudioBuffer<float>& spilloverBuffer = GranulatorTester::getGrainBuffer2(granulator);
-	int numChannels = grainBuffer1.getNumChannels();
+	juce::AudioBuffer<float>& readingBuffer = GranulatorTester::getReadingBuffer(granulator);
+	juce::AudioBuffer<float>& spilloverBuffer = GranulatorTester::getSpilloverBuffer(granulator);
+	int numChannels = readingBuffer.getNumChannels();
 
 	SECTION("No shifting, grains of size 256 (2x period of 128) are positioned accordingly.")
 	{
 		input.detectedPeriod = 128.f;
 		input.shiftedPeriod = 128.f; // no shifting
 
-		GranulatorTester::granulateToGrainBuffer(granulator, input.lookaheadBuffer, grainBuffer1, spilloverBuffer,
+		GranulatorTester::granulateToGrainBuffer(granulator, input.lookaheadBuffer, readingBuffer, spilloverBuffer,
 												input.detectedPeriod, input.shiftedPeriod);
 
 		// GRAIN 1: [0-255] -> 1.f
 		for (int i = 0; i <= 255; ++i)
 			for (int ch = 0; ch < numChannels; ++ch)
-				CHECK(grainBuffer1.getSample(ch, i) == 1.f);
+				CHECK(readingBuffer.getSample(ch, i) == 1.f);
 
 		// GRAIN 2: [256-511] -> 2.f
 		for (int i = 256; i <= 511; ++i)
 			for (int ch = 0; ch < numChannels; ++ch)
-				CHECK(grainBuffer1.getSample(ch, i) == 2.f);
+				CHECK(readingBuffer.getSample(ch, i) == 2.f);
 
 		// GRAIN 3: [512-767] -> 3.f
 		for (int i = 512; i <= 767; ++i)
 			for (int ch = 0; ch < numChannels; ++ch)
-				CHECK(grainBuffer1.getSample(ch, i) == 3.f);
+				CHECK(readingBuffer.getSample(ch, i) == 3.f);
 
 		// GRAIN 4: [768-1023] -> 4.f
 		for (int i = 768; i <= 1023; ++i)
 			for (int ch = 0; ch < numChannels; ++ch)
-				CHECK(grainBuffer1.getSample(ch, i) == 4.f);
+				CHECK(readingBuffer.getSample(ch, i) == 4.f);
 	}
 
 	SECTION("Shifting up, overlap expected at overlapping indices")
