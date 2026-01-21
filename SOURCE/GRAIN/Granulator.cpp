@@ -1,384 +1,196 @@
 /**
  * Granulator.cpp
- * Created by Ryan Devens on 2025-10-13
+ * Created by Ryan Devens
  */
 
-// Suppress MSVC warning C4244 from std::make_unique<Window> template instantiation in <memory>
-#if defined(_MSC_VER)
-    #pragma warning(push)
-    #pragma warning(disable: 4244)
-#endif
-
 #include "Granulator.h"
-#include "../SUBMODULES/RD/SOURCE/BufferRange.h"
 #include "../SUBMODULES/RD/SOURCE/BufferHelper.h"
 
 Granulator::Granulator()
-	: mGrainBuffers(kNumGrainBuffers)
 {
 	mWindow = std::make_unique<Window>();
-	//mWindow->setLooping(true);
 }
 
 Granulator::~Granulator()
 {
 	mWindow.reset();
-
 }
 
-#if defined(_MSC_VER)
-    #pragma warning(pop)
-#endif
-
-//====================================
-void Granulator::prepare(double sampleRate, int blockSize, int lookaheadSize)
+//=======================================
+void Granulator::prepare(double sampleRate, int blockSize, int maxGrainSize)
 {
-	mProcessBlockSize = blockSize;
+	mSampleRate = sampleRate;
+	mBlockSize = blockSize;
+	mMaxGrainSize = maxGrainSize;
 
-	for (auto& grainBuffer : mGrainBuffers)
+	// Pre-allocate grain read buffer (2 * period for full grain)
+	mGrainReadBuffer.setSize(2, maxGrainSize);
+	mGrainReadBuffer.clear();
+
+	// Reset all grains
+	for (auto& grain : mGrains)
 	{
-		grainBuffer.clear();
-		grainBuffer.setSize(2, lookaheadSize);
+		grain.reset();
 	}
 
-	// Initialize buffer state indices
-	mReadingBufferIndex = 0;
-	mWritingBufferIndex = 1;
-	mSpilloverBufferIndex = 2;
+	mNextAbsSynthStartIndex = 0;
 
-	mNeedToFillReading = true;
-	mGrainReadPos = 0;
-	mWindow->setSizeShapePeriod(static_cast<int>(sampleRate), Window::Shape::kHanning, blockSize); // period updated after pitch detection
+	// Configure window
+	mWindow->setSizeShapePeriod(static_cast<int>(sampleRate), Window::Shape::kHanning, maxGrainSize);
 	mWindow->setLooping(true);
 }
 
-
 //=======================================
-void Granulator::granulate(juce::AudioBuffer<float>& lookaheadBuffer, juce::AudioBuffer<float>& processBlock,
-							float detectedPeriod, float shiftedPeriod)
+void Granulator::process(juce::AudioBuffer<float>& processBlock,
+						 CircularBuffer& circularBuffer,
+						 AnalysisMarker& analysisMarker,
+						 juce::int64 absSampleIndex,
+						 float detectedPeriod,
+						 float shiftedPeriod)
 {
-	if(_shouldGranulateToReadingBuffer())
+	// Check if we need to create a new grain
+	// if the absSampleIndex is far enough along that we will need the next
+	// analysis window to make the next expected grain.
+	// However, don't make any new ones if no period was detected (less than 2)
+	if (absSampleIndex >= mNextAbsSynthStartIndex && detectedPeriod >= 2.f)
 	{
-		_granulateToReadingBuffer(lookaheadBuffer, detectedPeriod, shiftedPeriod);
-		mNeedToFillReading = false;
-	}
-	else if(_shouldGranulateToWritingBuffer())
-	{
-		_granulateToWritingBuffer(lookaheadBuffer, detectedPeriod, shiftedPeriod);
-	}
-
-	// Rotation of buffer states happens when we've read past the reading buffer
-	int grainBufferSize = _getReadingBuffer().getNumSamples();
-	if(mGrainReadPos >= grainBufferSize)
-	{
-		mGrainReadPos = mGrainReadPos - grainBufferSize; // wrap read pos, all grain buffers are same size
-		_rotateBufferStates();
+		_makeGrain(circularBuffer, analysisMarker, absSampleIndex, detectedPeriod, shiftedPeriod);
+		_updateNextSynthStartIndex(shiftedPeriod);
 	}
 
-	_writeFromGrainBufferToProcessBlock(processBlock);
+	// Process all active grains
+	_processActiveGrains(processBlock, circularBuffer, absSampleIndex);
 }
 
 //=======================================
-bool Granulator::_shouldGranulateToReadingBuffer()
+int Granulator::_findInactiveGrainIndex()
 {
-	return mNeedToFillReading;
-}
-
-//=======================================
-bool Granulator::_shouldGranulateToWritingBuffer()
-{
-	bool shouldGranulate = false;
-
-	// this function determines if we will run out of grain data in the current block
-	// block size of 256 samples will span from 0-255.
-	// So if we are starting at index 768 in grainBuffer and block size is 256,
-	// we won't granulate writing buffer until next block.
-	// b/c we have all the grain data needed to finish out current process block with reading buffer
-	int finalGrainReadPosThisBlock = mGrainReadPos + mProcessBlockSize - 1;
-
-	// we are about to read beyond the end of the reading buffer
-	// in this processBlock, so granulate the writing buffer and be ready to rotate.
-	if(finalGrainReadPosThisBlock >= _getReadingBuffer().getNumSamples() || mGrainReadPos == 0)
+	for (int i = 0; i < kNumGrains; ++i)
 	{
-		shouldGranulate = true;
+		if (!mGrains[i].isActive)
+			return i;
 	}
-
-	return shouldGranulate;
-}
-
-
-//=======================================
-void Granulator::_granulateToReadingBuffer(juce::AudioBuffer<float>& bufferToGranulate, float detectedPeriod, float shiftedPeriod)
-{
-	_granulateToGrainBuffer(bufferToGranulate, _getReadingBuffer(), _getWritingBuffer(), detectedPeriod, shiftedPeriod);
+	return -1; // No inactive grain available
 }
 
 //=======================================
-void Granulator::_granulateToWritingBuffer(juce::AudioBuffer<float>& bufferToGranulate, float detectedPeriod, float shiftedPeriod)
+void Granulator::_makeGrain(CircularBuffer& circularBuffer,
+							juce::int64 absSampleIndex,
+							float detectedPeriod,
+							float shiftedPeriod)
 {
-	_granulateToGrainBuffer(bufferToGranulate, _getWritingBuffer(), _getSpilloverBuffer(), detectedPeriod, shiftedPeriod);
+	int grainIndex = _findInactiveGrainIndex();
+	if (grainIndex < 0)
+		return; // No available slot
+
+	Grain& grain = mGrains[grainIndex];
+
+	// Get analysis mark from AnalysisMarker
+	juce::int64 absAnalysisMark = analysisMarker.getNextAnalysisMarkIndex(circularBuffer, detectedPeriod, absSampleIndex);
+
+	// Set up the grain
+	grain.isActive = true;
+	grain.mAbsAnalysisMarkIndex = absAnalysisMark;
+	grain.mAbsSynthesisMarkIndex = mNextAbsSynthStartIndex;
+	grain.detectedPeriod = detectedPeriod;
+
+	// Update window period for this grain
+	int grainSize = static_cast<int>(detectedPeriod * 2.0f);
+	mWindow->setPeriod(grainSize);
 }
 
 //=======================================
-void Granulator::_granulateToGrainBuffer(juce::AudioBuffer<float>& bufferToGranulate, juce::AudioBuffer<float>& grainBuffer,
-										 juce::AudioBuffer<float>& spilloverBuffer, float detectedPeriod, float shiftedPeriod)
+void Granulator::_processActiveGrains(juce::AudioBuffer<float>& processBlock,
+									  CircularBuffer& circularBuffer,
+									  juce::int64 absSampleIndex)
 {
-	mWindow->setPeriod(static_cast<int>(detectedPeriod));
+	int numChannels = processBlock.getNumChannels();
+	int blockSize = processBlock.getNumSamples();
 
-
-
-	// we are concerned with the grains we need to write to the grainBuffer/spillover
-	// if shifting down we may not read all the lookahead.
-	// shifting up we have more synth indices than analysis
-	while (mCurrentSynthMarkIndex < grainBuffer.getNumSamples())
+	for (auto& grain : mGrains)
 	{
-		mCurrentAnalysisMarkIndex = _getNextAnalysisMarkIndex(bufferToGranulate, detectedPeriod, mCurrentAnalysisMarkIndex);
-		mCurrentSynthMarkIndex = _getNextSynthMarkIndex(detectedPeriod, shiftedPeriod, mCurrentSynthMarkIndex, mCurrentAnalysisMarkIndex);
+		if (!grain.isActive)
+			continue;
 
-		auto [analStart, analCenter, analEnd] = _getAnalysisBounds(bufferToGranulate, mCurrentAnalysisMarkIndex, detectedPeriod);
-		auto [synthStart, synthEnd] = _getSynthBounds(mCurrentSynthMarkIndex, detectedPeriod);
+		int grainSize = static_cast<int>(grain.detectedPeriod * 2.0f);
+		juce::int64 grainSynthStart = grain.mAbsSynthesisMarkIndex - static_cast<juce::int64>(grain.detectedPeriod);
+		juce::int64 grainSynthEnd = grainSynthStart + grainSize - 1;
 
-		int sourceBufferSize = bufferToGranulate.getNumSamples();
-		int destBufferSize = grainBuffer.getNumSamples();
+		// Check if this grain overlaps with current block
+		juce::int64 blockStart = absSampleIndex;
+		juce::int64 blockEnd = absSampleIndex + blockSize - 1;
 
-		// Rectify analysis (read) bounds to valid source buffer range
-		int rectifiedAnalStart = analStart >= 0 ? analStart : 0;
-		int rectifiedAnalEnd = analEnd < sourceBufferSize ? analEnd : sourceBufferSize - 1;
-		int analStartClipOffset = rectifiedAnalStart - analStart;
-
-		// Rectify synth (write) bounds to valid dest buffer range
-		int rectifiedSynthStart = synthStart >= 0 ? synthStart : 0;
-		int rectifiedSynthEnd = synthEnd < destBufferSize ? synthEnd : destBufferSize - 1;
-		int synthStartClipOffset = rectifiedSynthStart - synthStart;
-
-		RD::BufferRange readRange;
-		readRange.setStartIndex(rectifiedAnalStart);
-		readRange.setEndIndex(rectifiedAnalEnd);
-
-		RD::BufferRange writeRange;
-		writeRange.setStartIndex(rectifiedSynthStart);
-		writeRange.setEndIndex(rectifiedSynthEnd);
-
-		// Get the grain as an audio block from the source buffer (rectified range only)
-		juce::dsp::AudioBlock<float> grainBlock = BufferHelper::getRangeAsBlock(bufferToGranulate, readRange);
-
-		// Set window phase based on how much was clipped from analysis start
-		double phaseIncrement = (double)mWindow->getSize() / (double)mWindow->getPeriod();
-		double windowPhase = analStartClipOffset * phaseIncrement;
-		mWindow->setReadPos(windowPhase);
-
-		// Apply window starting at correct phase
-		BufferHelper::applyWindowToBlock(grainBlock, *mWindow.get());
-
-		// Handle misaligned clipping between read and write ranges
-		// Sample at grainBlock[i] came from (analStart + analStartClipOffset + i)
-		// and should write to (synthStart + analStartClipOffset + i)
-		juce::dsp::AudioBlock<float> blockToWrite = grainBlock;
-		int blockOffset = 0;
-		int actualWriteStart = rectifiedSynthStart;
-
-		if (synthStartClipOffset > analStartClipOffset)
+		if (grainSynthEnd < blockStart || grainSynthStart > blockEnd)
 		{
-			// Synth clipped more at start - skip samples from grainBlock
-			blockOffset = synthStartClipOffset - analStartClipOffset;
-		}
-		else if (analStartClipOffset > synthStartClipOffset)
-		{
-			// Analysis clipped more at start - shift write position forward
-			actualWriteStart = rectifiedSynthStart + (analStartClipOffset - synthStartClipOffset);
+			// Grain doesn't overlap with this block
+			// If grain is completely in the past, deactivate it
+			if (grainSynthEnd < blockStart)
+			{
+				grain.isActive = false;
+			}
+			continue;
 		}
 
-		// Calculate how many samples we can actually write
-		int grainBlockSize = static_cast<int>(grainBlock.getNumSamples());
-		int availableSamples = grainBlockSize - blockOffset;
-		int writeSpaceAvailable = rectifiedSynthEnd - actualWriteStart + 1;
-		int samplesToWrite = std::min(availableSamples, writeSpaceAvailable);
+		// Calculate overlap region
+		juce::int64 overlapStart = std::max(grainSynthStart, blockStart);
+		juce::int64 overlapEnd = std::min(grainSynthEnd, blockEnd);
 
-		if (samplesToWrite > 0 && blockOffset < grainBlockSize)
+		// Read grain data from circular buffer
+		juce::int64 grainAnalysisStart = grain.mAbsAnalysisMarkIndex - static_cast<juce::int64>(grain.detectedPeriod);
+		int circBufferSize = circularBuffer.getSize();
+
+		// Calculate window phase offset if grain started before this block
+		int windowStartOffset = 0;
+		if (grainSynthStart < blockStart)
 		{
-			blockToWrite = grainBlock.getSubBlock(
-				static_cast<size_t>(blockOffset),
-				static_cast<size_t>(samplesToWrite)
-			);
+			windowStartOffset = static_cast<int>(blockStart - grainSynthStart);
+		}
 
-			writeRange.setStartIndex(actualWriteStart);
-			writeRange.setEndIndex(actualWriteStart + samplesToWrite - 1);
+		// Set window read position
+		double phaseIncrement = static_cast<double>(mWindow->getSize()) / static_cast<double>(mWindow->getPeriod());
+		mWindow->setReadPos(windowStartOffset * phaseIncrement);
 
-			// Write the grain block to the output buffer
-			BufferHelper::writeBlockToBuffer(grainBuffer, blockToWrite, writeRange);
+		// Process each sample in the overlap region
+		for (juce::int64 absSample = overlapStart; absSample <= overlapEnd; ++absSample)
+		{
+			// Index within this process block
+			int blockIndex = static_cast<int>(absSample - blockStart);
+
+			// Index within the grain
+			int grainIndex = static_cast<int>(absSample - grainSynthStart);
+
+			// Corresponding analysis index (absolute)
+			juce::int64 absAnalysisIndex = grainAnalysisStart + grainIndex;
+
+			// Convert to circular buffer index
+			int circIndex = static_cast<int>(absAnalysisIndex % circBufferSize);
+			if (circIndex < 0) circIndex += circBufferSize;
+
+			// Get window value
+			float windowValue = mWindow->getNextSample();
+
+			// Read from circular buffer and apply window
+			for (int ch = 0; ch < numChannels; ++ch)
+			{
+				float sample = circularBuffer.getBuffer().getSample(ch, circIndex);
+				float windowedSample = sample * windowValue;
+
+				// Add to output (overlap-add)
+				float currentSample = processBlock.getSample(ch, blockIndex);
+				processBlock.setSample(ch, blockIndex, currentSample + windowedSample);
+			}
+		}
+
+		// Deactivate grain if it's completely processed
+		if (grainSynthEnd <= blockEnd)
+		{
+			grain.isActive = false;
 		}
 	}
 }
 
-//==========================================
-int Granulator::_getNextAnalysisMarkIndex(juce::AudioBuffer<float>& lookaheadBuffer, float detectedPeriod, int currentIndex)
-{
-	int updatedIndex = currentIndex;
-
-	if(updatedIndex < 0)
-	{
-		updatedIndex = BufferHelper::getPeakIndex(lookaheadBuffer, 0, (int)detectedPeriod);
-	}
-	else
-	{
-		updatedIndex = updatedIndex + (int)detectedPeriod;
-	}
-
-	// wrap around lookaheadBuffer
-	if(updatedIndex >= lookaheadBuffer.getNumSamples())
-		updatedIndex = updatedIndex - lookaheadBuffer.getNumSamples();
-
-	return updatedIndex;
-
-}
-
-//==========================================
-std::tuple<int, int, int> Granulator::_getAnalysisBounds(juce::AudioBuffer<float>& buffer, int analysisMarkIndex, float detectedPeriod)
-{
-	int center = _getWindowCenterIndex(buffer, analysisMarkIndex, detectedPeriod);
-	int start = center - detectedPeriod;
-	int end = center + detectedPeriod - 1;
-	return {start, center, end};
-}
-
-//==========================================
-std::tuple<int, int> Granulator::_getSynthBounds(int synthMarkIndex, float detectedPeriod)
-{
-	int center = synthMarkIndex;
-	int start = center - detectedPeriod;
-	int end = center + detectedPeriod - 1;
-	return {start, end};
-}
-
-//==========================================
-int Granulator::_getWindowCenterIndex(juce::AudioBuffer<float>& buffer, int analysisMarkIndex, float detectedPeriod)
-{
-	int centerIndex = analysisMarkIndex;
-
-	int radius = (int)(detectedPeriod / 4.f);
-	centerIndex = BufferHelper::getPeakIndex(buffer, centerIndex - radius, centerIndex + radius, centerIndex);
-
-	return centerIndex;
-}
-
-
-
-//==========================================
-int Granulator::_getNextSynthMarkIndex(float detectedPeriod, float shiftedPeriod,
-									int currentSynthMarkIndex, int currentAnalysisMarkIndex)
-{
-	int nextSynthMarkIndex = 0;
-	if(currentSynthMarkIndex < 0)
-	{
-		nextSynthMarkIndex = currentAnalysisMarkIndex; // first one lines up
-	}
-	else
-	{
-		nextSynthMarkIndex = currentSynthMarkIndex + (int)shiftedPeriod;
-	}
-
-	return nextSynthMarkIndex;
-}
-
-//==========================================
-int Granulator::_getWrappedSynthMarkIndex(juce::AudioBuffer<float>& buffer, int synthMarkIndex)
-{
-	int bufferSize = buffer.getNumSamples();
-	int wrappedIndex = synthMarkIndex;
-
-	if (wrappedIndex >= bufferSize)
-		wrappedIndex = wrappedIndex - bufferSize;
-
-	return wrappedIndex;
-}
-
 //=======================================
-void Granulator::_writeFromGrainBufferToProcessBlock(juce::AudioBuffer<float>& processBlock)
+void Granulator::_updateNextSynthStartIndex(float shiftedPeriod)
 {
-	for(int sampleIndex = 0; sampleIndex < processBlock.getNumSamples(); sampleIndex++)
-	{
-		for(int ch = 0; ch < processBlock.getNumChannels(); ch++)
-		{
-			float grainSample = _getReadingBuffer().getSample(ch, mGrainReadPos);
-			processBlock.setSample(ch, sampleIndex, grainSample);
-		}
-		mGrainReadPos++;
-	}
+	mNextAbsSynthStartIndex += static_cast<juce::int64>(shiftedPeriod);
 }
-
-//=======================================
-void Granulator::_rotateBufferStates()
-{
-	// Save current indices before rotation
-	int oldReadingIndex = mReadingBufferIndex;
-	int oldWritingIndex = mWritingBufferIndex;
-	int oldSpilloverIndex = mSpilloverBufferIndex;
-
-	// Clear the buffer that is becoming Spillover (the old Reading buffer)
-	mGrainBuffers[oldReadingIndex].clear();
-
-	// Rotate states:
-	// - Old Reading -> new Spillover (just cleared)
-	// - Old Writing -> new Reading (keeps data, will be read from)
-	// - Old Spillover -> new Writing (keeps spillover data, new writes add to it)
-	mReadingBufferIndex = oldWritingIndex;
-	mWritingBufferIndex = oldSpilloverIndex;
-	mSpilloverBufferIndex = oldReadingIndex;
-}
-
-//=======================================
-juce::AudioBuffer<float>& Granulator::getReadingBuffer()
-{
-	return _getReadingBuffer();
-}
-
-//=======================================
-juce::AudioBuffer<float>& Granulator::_getReadingBuffer()
-{
-	return mGrainBuffers[mReadingBufferIndex];
-}
-
-//=======================================
-juce::AudioBuffer<float>& Granulator::_getWritingBuffer()
-{
-	return mGrainBuffers[mWritingBufferIndex];
-}
-
-//=======================================
-juce::AudioBuffer<float>& Granulator::_getSpilloverBuffer()
-{
-	return mGrainBuffers[mSpilloverBufferIndex];
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
