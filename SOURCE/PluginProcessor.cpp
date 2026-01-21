@@ -2,6 +2,7 @@
 #include "PluginEditor.h"
 #include "PITCH/PitchDetector.h"
 #include "GRAIN/Granulator.h"
+#include "GRAIN/AnalysisMarker.h"
 #include "../SUBMODULES/RD/SOURCE/CircularBuffer.h"
 #include "../SUBMODULES/RD/SOURCE/Window.h"
 
@@ -13,12 +14,10 @@ PluginProcessor::PluginProcessor()
     mPitchDetector = std::make_unique<PitchDetector>();
     mCircularBuffer = std::make_unique<CircularBuffer>();
 	mGranulator = std::make_unique<Granulator>();
-	// mWindow = std::make_unique<Window>();
-	// mWindow->setLooping(true);
-
+	mAnalysisMarker = std::make_unique<AnalysisMarker>();
 
 	mShiftRatio = 1.f;
-	
+
     _initParameterListeners();
 
 }
@@ -30,7 +29,7 @@ PluginProcessor::~PluginProcessor()
 	mCircularBuffer.reset();
     mPitchDetector.reset();
     mGranulator.reset();
-	//mWindow.reset();
+	mAnalysisMarker.reset();
 }
 
 //==============================================================================
@@ -102,24 +101,25 @@ void PluginProcessor::changeProgramName (int index, const juce::String& newName)
 void PluginProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
 	// be atleast minLookaheadSize, if at or above, use 2x block size
-	int lookaheadBufferNumSamples = samplesPerBlock >= MagicNumbers::minLookaheadSize ? (samplesPerBlock * 2) : MagicNumbers::minLookaheadSize;
+	int pitchDetectBufferNumSamples = samplesPerBlock >= MagicNumbers::minDetectionSize ? (samplesPerBlock * 2) : MagicNumbers::minLookaheadSize;
 	// scale for sample rates, we deal with the same size for 44100 and 48000 for now (same for 88200 and 96000)
 	if(sampleRate > 48000.0 && sampleRate <= 96000.0)
-		lookaheadBufferNumSamples = lookaheadBufferNumSamples * 2;
+		pitchDetectBufferNumSamples = pitchDetectBufferNumSamples * 2;
 	else if(sampleRate > 96000.0)
-		lookaheadBufferNumSamples = lookaheadBufferNumSamples * 4;
+		pitchDetectBufferNumSamples = pitchDetectBufferNumSamples * 4;
 
-	mLookaheadBuffer.clear();
-	mLookaheadBuffer.setSize(getTotalNumOutputChannels(), lookaheadBufferNumSamples);
+	mDetectionBuffer.clear();
+	mDetectionBuffer.setSize(getTotalNumOutputChannels(), pitchDetectBufferNumSamples);
 
-    mPitchDetector->prepareToPlay(sampleRate, lookaheadBufferNumSamples);
+    mPitchDetector->prepareToPlay(sampleRate, pitchDetectBufferNumSamples);
 
-	int lookaheadNumSamples = lookaheadBufferNumSamples - samplesPerBlock;
-    mCircularBuffer->setSize(getTotalNumOutputChannels(), static_cast<int>(sampleRate) * 2); // by default 1 second
-    mCircularBuffer->setDelay(lookaheadNumSamples);
+    mCircularBuffer->setSize(getTotalNumOutputChannels(), static_cast<int>(pitchDetectBufferNumSamples) * 2); // by default 2 seconds
+    mCircularBuffer->setDelay(MagicNumbers::minLookaheadSize);
 
-    mGranulator->prepare(sampleRate, samplesPerBlock, lookaheadBufferNumSamples);
+    mGranulator->prepare(sampleRate, samplesPerBlock, pitchDetectBufferNumSamples);
+	mAnalysisMarker->prepare(sampleRate, samplesPerBlock);
 
+	mSamplesProcessed = 0;
 }
 
 void PluginProcessor::releaseResources()
@@ -159,27 +159,47 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     [[maybe_unused]] auto totalNumInputChannels  = getTotalNumInputChannels();
     [[maybe_unused]] auto totalNumOutputChannels = getTotalNumOutputChannels();
 
+    // write audio to circular buffer
     bool writeSuccess = mCircularBuffer->pushBuffer(buffer);
 	if(!writeSuccess)
 		return;
 
+    // invalid values, bail out
+
+    // clean up buffers, about to fill
 	buffer.clear();
-    mLookaheadBuffer.clear();
-    mCircularBuffer->popBufferWithLookahead(mLookaheadBuffer, buffer);
+    mDetectionBuffer.clear();
+
+    
+    // range we will detect on
+    auto [detectStart, detectEnd] = getCurrentAnalysisWindowBounds();
+    mCircularBuffer->readRange(mDetectionBuffer, detectStart, detectEnd);
+
+    float detected_period = mPitchDetector->process(mDetectionBuffer);
+
+    float shiftedPeriod = detected_period / mShiftRatio;
+
+    // Granulator has to get process calls even when no pitch detected, so check for valid period ther (period>2)
+    mGranulator->process(buffer,
+                        *mCircularBuffer.get(),
+                        *mAnalysisMarker.get(),
+                        mSamplesProcessed,
+                        detected_period,
+                        shiftedPeriod);
+    if(detected_period > 2.f)
+	{
+
+	}
+    else
+    {
+        auto [readStart, readEnd] = getDelayedDryProcessBlockStartEnd();
+        mCircularBuffer->popBufferInRange(buffer, readStart, readEnd);
+
+    }
 
 
-    float detected_period = mPitchDetector->process(mLookaheadBuffer);
 
-	if(mShiftRatio < 0.5 || mShiftRatio > 1.5 || detected_period < 2)
-		return;
-		
-	float periodAfterShifting = detected_period / mShiftRatio;
-
-    mGranulator->granulate(mLookaheadBuffer, buffer, detected_period, periodAfterShifting);
-
-	// // window period set in this function. Need to pass detected_period anyways
-	// mGranulator->granulateBuffer(mLookaheadBuffer, buffer, detected_period, periodAfterShifting, *mWindow.get(), true);
-
+	mSamplesProcessed += buffer.getNumSamples();
 }
 
 //==============================================================================
@@ -239,7 +259,8 @@ void PluginProcessor::parameterChanged(const juce::String& parameterID, float ne
 {
     if(parameterID == "shift ratio")
     {
-		mShiftRatio = newValue;
+        float clampedValue = juce::jlimit(0.5f, 1.5f, newValue);
+		mShiftRatio = clampedValue;
     }
     else if(parameterID == "emission rate")
     {
@@ -289,4 +310,25 @@ void PluginProcessor::_initParameterListeners()
 {
     apvts.addParameterListener("shift ratio", this);
     apvts.addParameterListener("emission rate", this);
+}
+
+//-------------------------------------------
+std::tuple<juce::int64, juce::int64> PluginProcessor::getCurrentAnalysisWindowBounds()
+{
+    // where we will be at the end of this block
+    juce::int64 endProcessSample = mSamplesProcessed + getBlockSize() - 1; 
+    // The end sample index of windowed audio data, but adjusted by lookahead
+    juce::int64 endWindowSample = endProcessSample - MagicNumbers::minLookaheadSize;
+    juce::int64 startWindowSample = endWindowSample - MagicNumbers::minDetectionSize;
+    return std::make_tuple(startWindowSample, endWindowSample);
+}
+
+//-------------------------------------------
+std::tuple<juce::int64, juce::int64> PluginProcessor::getDelayedDryProcessBlockStartEnd()
+{
+    // where we will be at the end of this block
+    juce::int64 startProcessSample = mSamplesProcessed - getBlockSize();
+    juce::int64 endProcessSample = mSamplesProcessed - 1; 
+
+    return std::make_tuple(startProcessSample, endProcessSample);
 }

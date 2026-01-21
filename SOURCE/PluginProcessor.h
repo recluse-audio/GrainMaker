@@ -5,6 +5,7 @@
 class CircularBuffer;
 class PitchDetector;
 class Granulator;
+class AnalysisMarker;
 class Window;
 
 #if (MSVC)
@@ -13,7 +14,8 @@ class Window;
 
 namespace MagicNumbers
 {
-	constexpr int minLookaheadSize = 1024;
+	constexpr int minLookaheadSize = 512; // for synthesis
+    constexpr int minDetectionSize = 1024; // for detection
 } // end namespace MagicNumbers
 class PluginProcessor : public juce::AudioProcessor
                       , public juce::AudioProcessorValueTreeState::Listener
@@ -56,15 +58,22 @@ public:
    // AudioProcessorValueTreeState::Listener callback
     void parameterChanged(const juce::String& parameterID, float newValue) override;
 
+    std::tuple<juce::int64, juce::int64> getAnalysisStartEnd();
+    // happens when no pitch is detected and we want to let dry signal back through, but still delayed
+    std::tuple<juce::int64, juce::int64> getDelayedDryProcessBlockStartEnd();
 
-private:
+    private:
 	float mShiftRatio = 1.f;
     std::unique_ptr<PitchDetector> mPitchDetector;
     std::unique_ptr<Granulator> mGranulator;
-    std::unique_ptr<CircularBuffer> mCircularBuffer; 
+    std::unique_ptr<CircularBuffer> mCircularBuffer;
+	std::unique_ptr<AnalysisMarker> mAnalysisMarker;
 	std::unique_ptr<Window> mWindow;
 
-	juce::AudioBuffer<float> mLookaheadBuffer;
+	juce::AudioBuffer<float> mDetectionBuffer;
+
+	juce::int64 mSamplesProcessed = 0;
+
 
     juce::AudioProcessorValueTreeState apvts;
     juce::AudioProcessorValueTreeState::ParameterLayout _createParameterLayout();
