@@ -4,16 +4,13 @@
  */
 
 #include "Granulator.h"
-#include "../SUBMODULES/RD/SOURCE/BufferHelper.h"
 
 Granulator::Granulator()
 {
-	mWindow = std::make_unique<Window>();
 }
 
 Granulator::~Granulator()
 {
-	mWindow.reset();
 }
 
 //=======================================
@@ -27,39 +24,50 @@ void Granulator::prepare(double sampleRate, int blockSize, int maxGrainSize)
 	mGrainReadBuffer.setSize(2, maxGrainSize);
 	mGrainReadBuffer.clear();
 
-	// Reset all grains
+	// Prepare each grain's window and reset
 	for (auto& grain : mGrains)
 	{
+		grain.prepare(static_cast<int>(sampleRate));
 		grain.reset();
 	}
+}
 
-	mNextAbsSynthStartIndex = 0;
 
-	// Configure window
-	mWindow->setSizeShapePeriod(static_cast<int>(sampleRate), Window::Shape::kHanning, maxGrainSize);
-	mWindow->setLooping(true);
+//=======================================
+void Granulator::processDetecting(juce::AudioBuffer<float>& processBlock, CircularBuffer& circularBuffer,  
+									std::tuple<int, int> dryBlockRange)
+{
+	_processActiveGrains(processBlock, circularBuffer, )
 }
 
 //=======================================
-void Granulator::process(juce::AudioBuffer<float>& processBlock,
-						 CircularBuffer& circularBuffer,
-						 AnalysisMarker& analysisMarker,
-						 juce::int64 absSampleIndex,
-						 float detectedPeriod,
-						 float shiftedPeriod)
+void Granulator::processTracking(juce::AudioBuffer<float>& processBlock, CircularBuffer& circularBuffer,
+				 		std::tuple<juce::int64, juce::int64> analysisReadRangeInSampleCount, 
+						std::tuple<juce::int64, juce::int64> analysisWriteRangeInSampleCount,
+						std::tuple<juce::int64, juce::int64> processCounterRange,
+				  		float detectedPeriod,  float shiftedPeriod)
 {
-	// Check if we need to create a new grain
-	// if the absSampleIndex is far enough along that we will need the next
-	// analysis window to make the next expected grain.
-	// However, don't make any new ones if no period was detected (less than 2)
-	if (absSampleIndex >= mNextAbsSynthStartIndex && detectedPeriod >= 2.f)
+	// center of would be grain.
+	juce::int64 analysisWriteMark = std::get<0>(analysisWriteRangeInSampleCount) + (juce::int64)(detectedPeriod);
+
+	while(mSynthMark < analysisWriteMark)
 	{
-		_makeGrain(circularBuffer, analysisMarker, absSampleIndex, detectedPeriod, shiftedPeriod);
-		_updateNextSynthStartIndex(shiftedPeriod);
+		// no previous marks 
+		if(mSynthMark < 0)
+		{
+			mSynthMark = analysisWriteMark;
+		}
+		
+		_makeGrain(circularBuffer, analysisReadRangeInSampleCount, analysisWriteRangeInSampleCount, detectedPeriod);
+
+		mSynthMark = mSynthMark + (juce::int64)shiftedPeriod; // IMPORTANT TO USE SHIFTED HERE
 	}
 
+
+
+	// 
 	// Process all active grains
-	_processActiveGrains(processBlock, circularBuffer, absSampleIndex);
+	_processActiveGrains(processBlock, circularBuffer, processCounterRange);
 }
 
 //=======================================
@@ -75,9 +83,9 @@ int Granulator::_findInactiveGrainIndex()
 
 //=======================================
 void Granulator::_makeGrain(CircularBuffer& circularBuffer,
-							juce::int64 absSampleIndex,
-							float detectedPeriod,
-							float shiftedPeriod)
+				 		std::tuple<juce::int64, juce::int64> analysisReadRangeInSampleCount, 
+						std::tuple<juce::int64, juce::int64> analysisWriteRangeInSampleCount,
+						float detectedPeriod)
 {
 	int grainIndex = _findInactiveGrainIndex();
 	if (grainIndex < 0)
@@ -85,24 +93,17 @@ void Granulator::_makeGrain(CircularBuffer& circularBuffer,
 
 	Grain& grain = mGrains[grainIndex];
 
-	// Get analysis mark from AnalysisMarker
-	juce::int64 absAnalysisMark = analysisMarker.getNextAnalysisMarkIndex(circularBuffer, detectedPeriod, absSampleIndex);
-
 	// Set up the grain
 	grain.isActive = true;
-	grain.mAbsAnalysisMarkIndex = absAnalysisMark;
-	grain.mAbsSynthesisMarkIndex = mNextAbsSynthStartIndex;
-	grain.detectedPeriod = detectedPeriod;
 
-	// Update window period for this grain
+	// Configure this grain's window
 	int grainSize = static_cast<int>(detectedPeriod * 2.0f);
-	mWindow->setPeriod(grainSize);
+	grain.setWindowPeriod(grainSize);
 }
 
 //=======================================
-void Granulator::_processActiveGrains(juce::AudioBuffer<float>& processBlock,
-									  CircularBuffer& circularBuffer,
-									  juce::int64 absSampleIndex)
+void Granulator::_processActiveGrains(juce::AudioBuffer<float>& processBlock,  CircularBuffer& circularBuffer,
+								std::tuple<juce::int64, juce::int64> processCounterRange)
 {
 	int numChannels = processBlock.getNumChannels();
 	int blockSize = processBlock.getNumSamples();
@@ -112,13 +113,12 @@ void Granulator::_processActiveGrains(juce::AudioBuffer<float>& processBlock,
 		if (!grain.isActive)
 			continue;
 
-		int grainSize = static_cast<int>(grain.detectedPeriod * 2.0f);
-		juce::int64 grainSynthStart = grain.mAbsSynthesisMarkIndex - static_cast<juce::int64>(grain.detectedPeriod);
-		juce::int64 grainSynthEnd = grainSynthStart + grainSize - 1;
+		juce::int64 grainSynthStart = std::get<0>(grain.mSynthRange);
+		juce::int64 grainSynthEnd = std::get<1>(grain.mSynthRange);
 
 		// Check if this grain overlaps with current block
-		juce::int64 blockStart = absSampleIndex;
-		juce::int64 blockEnd = absSampleIndex + blockSize - 1;
+		juce::int64 blockStart = std::get<0>(processCounterRange);
+		juce::int64 blockEnd = std::get<1>(processCounterRange);
 
 		if (grainSynthEnd < blockStart || grainSynthStart > blockEnd)
 		{
@@ -136,8 +136,7 @@ void Granulator::_processActiveGrains(juce::AudioBuffer<float>& processBlock,
 		juce::int64 overlapEnd = std::min(grainSynthEnd, blockEnd);
 
 		// Read grain data from circular buffer
-		juce::int64 grainAnalysisStart = grain.mAbsAnalysisMarkIndex - static_cast<juce::int64>(grain.detectedPeriod);
-		int circBufferSize = circularBuffer.getSize();
+		juce::int64 grainAnalysisStart = std::get<0>(grain.mAnalysisRange);
 
 		// Calculate window phase offset if grain started before this block
 		int windowStartOffset = 0;
@@ -146,9 +145,8 @@ void Granulator::_processActiveGrains(juce::AudioBuffer<float>& processBlock,
 			windowStartOffset = static_cast<int>(blockStart - grainSynthStart);
 		}
 
-		// Set window read position
-		double phaseIncrement = static_cast<double>(mWindow->getSize()) / static_cast<double>(mWindow->getPeriod());
-		mWindow->setReadPos(windowStartOffset * phaseIncrement);
+		// Set grain's window read position
+		grain.setWindowPhaseOffset(windowStartOffset);
 
 		// Process each sample in the overlap region
 		for (juce::int64 absSample = overlapStart; absSample <= overlapEnd; ++absSample)
@@ -163,11 +161,10 @@ void Granulator::_processActiveGrains(juce::AudioBuffer<float>& processBlock,
 			juce::int64 absAnalysisIndex = grainAnalysisStart + grainIndex;
 
 			// Convert to circular buffer index
-			int circIndex = static_cast<int>(absAnalysisIndex % circBufferSize);
-			if (circIndex < 0) circIndex += circBufferSize;
+			int circIndex = circularBuffer.getWrappedIndex(absAnalysisIndex);
 
-			// Get window value
-			float windowValue = mWindow->getNextSample();
+			// Get window value from this grain's window
+			float windowValue = grain.getNextWindowSample();
 
 			// Read from circular buffer and apply window
 			for (int ch = 0; ch < numChannels; ++ch)

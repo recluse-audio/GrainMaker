@@ -58,12 +58,36 @@ public:
    // AudioProcessorValueTreeState::Listener callback
     void parameterChanged(const juce::String& parameterID, float newValue) override;
 
-    std::tuple<juce::int64, juce::int64> getAnalysisStartEnd();
+    // range of current process block relative to total num processed, no delay
+    std::tuple<juce::int64, juce::int64> getProcessCounterRange();
+    
+    // starts at delayed position behind process counter range
+    std::tuple<juce::int64, juce::int64> getDetectionRange();
+
+    // when we've detected a pitch, this is the range of a complete cycle nearest the end of the detection buffer
+    std::tuple<juce::int64, juce::int64> getFirstPeakRange(float detectedPeriod);
+
+    std::tuple<juce::int64, juce::int64> getPrecisePeakRange(juce::int64 predictedAnalysisMark, float detectedPeriod);
+
+    std::tuple<juce::int64, juce::int64> getAnalysisRange(juce::int64 analysisMark, float detectedPeriod);
+
     // happens when no pitch is detected and we want to let dry signal back through, but still delayed
-    std::tuple<juce::int64, juce::int64> getDelayedDryProcessBlockStartEnd();
+    std::tuple<juce::int64, juce::int64> getDryBlockRange();
+
+
+
+    enum class ProcessState
+    {
+        kDetecting = 0, // looking for a pitch (1st detection, noise b4)
+        kTracking = 1 // tracking a pitch (after atleast 1 detection)
+    };
+
+    ProcessState getCurrentState() { return mProcessState; }
 
     private:
-	float mShiftRatio = 1.f;
+	ProcessState mProcessState = ProcessState::kDetecting;
+
+    float mShiftRatio = 1.f;
     std::unique_ptr<PitchDetector> mPitchDetector;
     std::unique_ptr<Granulator> mGranulator;
     std::unique_ptr<CircularBuffer> mCircularBuffer;
@@ -73,6 +97,7 @@ public:
 	juce::AudioBuffer<float> mDetectionBuffer;
 
 	juce::int64 mSamplesProcessed = 0;
+    juce::int64 mPredictedNextAnalysisMark = (juce::int64) -1;
 
 
     juce::AudioProcessorValueTreeState apvts;
