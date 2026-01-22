@@ -19,10 +19,13 @@
         "titleBar.inactiveForeground": "#e7e7e799"
     },
     "peacock.color": "#1857a4",
-
-    // enable ding sounds
-    "terminal.integrated.enableBell": true,
     "audioCues.enabled": "on",
     "audioCues.breakpointHit": "on",
-    "audioCues.taskCompleted": "on"
+    "accessibility.signals.taskCompleted": {
+        "sound": "on"
+    },
+    "accessibility.signals.terminalBell": {
+        "sound": "on"
+    },
+    "terminal.integrated.enableVisualBell": true
 }

@@ -5,6 +5,8 @@
 #include "GRAIN/AnalysisMarker.h"
 #include "../SUBMODULES/RD/SOURCE/CircularBuffer.h"
 #include "../SUBMODULES/RD/SOURCE/Window.h"
+#include "../SUBMODULES/RD/SOURCE/BufferHelper.h"
+
 
 //==============================================================================
 PluginProcessor::PluginProcessor()
@@ -120,6 +122,7 @@ void PluginProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 	mAnalysisMarker->prepare(sampleRate, samplesPerBlock);
 
 	mSamplesProcessed = 0;
+    mPredictedNextAnalysisMark = (juce::int64) -1;
 }
 
 void PluginProcessor::releaseResources()
@@ -170,14 +173,50 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 	buffer.clear();
     mDetectionBuffer.clear();
 
-    
+    ProcessState prevProcessState = mProcessState;
+
     // range we will detect on
-    auto [detectStart, detectEnd] = getCurrentAnalysisWindowBounds();
+    auto [detectStart, detectEnd] = getDetectionRange();
     mCircularBuffer->readRange(mDetectionBuffer, detectStart, detectEnd);
 
+    // Try and detect pitch, update state accordingly in temp variable for now
     float detected_period = mPitchDetector->process(mDetectionBuffer);
+    if(detected_period > 2)
+        mProcessState = ProcessState::kTracking;
+    else
+        mProcessState = ProcessState::kDetecting;
 
-    float shiftedPeriod = detected_period / mShiftRatio;
+    auto processCounterRange = getProcessCounterRange();
+
+    if(mProcessState == ProcessState::kDetecting)
+    {
+        if(prevProcessState == ProcessState::kTracking)
+            mPredictedNextAnalysisMark = -1;
+
+        auto dryBufferRange = getDryBlockRange();
+        mGranulator->processDetecting(buffer, *mCircularBuffer.get(), dryBufferRange, processCounterRange);
+    }
+    else if (mProcessState == ProcessState::kTracking)
+    {
+        float shiftedPeriod = detected_period / mShiftRatio;
+        std::tuple<juce::int64, juce::int64> peakRange{0, 0};
+
+        // if we just started tracking, we need to find the first peak range 
+        if(prevProcessState == ProcessState::kDetecting)
+            peakRange = getFirstPeakRange(detected_period);
+        else
+            peakRange = getPrecisePeakRange(mPredictedNextAnalysisMark, detected_period);
+
+        juce::Range<juce::int64> peakRangeInCircularBuffer;
+        peakRangeInCircularBuffer.setStart(std::get<0>(peakRange));
+        peakRangeInCircularBuffer.setEnd(std::get<1>(peakRange));
+        juce::int64 markedIndex = mCircularBuffer->findPeakInRange(peakRangeInCircularBuffer);
+
+        auto analysisRange = getAnalysisRange(markedIndex, detected_period);
+
+        mGranulator->processTracking(buffer, *mCircularBuffer.get(), )
+    }
+
 
     // Granulator has to get process calls even when no pitch detected, so check for valid period ther (period>2)
     mGranulator->process(buffer,
@@ -186,17 +225,6 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
                         mSamplesProcessed,
                         detected_period,
                         shiftedPeriod);
-    if(detected_period > 2.f)
-	{
-
-	}
-    else
-    {
-        auto [readStart, readEnd] = getDelayedDryProcessBlockStartEnd();
-        mCircularBuffer->popBufferInRange(buffer, readStart, readEnd);
-
-    }
-
 
 
 	mSamplesProcessed += buffer.getNumSamples();
@@ -313,22 +341,61 @@ void PluginProcessor::_initParameterListeners()
 }
 
 //-------------------------------------------
-std::tuple<juce::int64, juce::int64> PluginProcessor::getCurrentAnalysisWindowBounds()
+std::tuple<juce::int64, juce::int64> PluginProcessor::getProcessCounterRange()
+{
+    // where we will be at the end of this block
+    juce::int64 startProcessSample = mSamplesProcessed;
+    juce::int64 endProcessSample = mSamplesProcessed + getBlockSize() - 1; 
+
+    return std::make_tuple(startProcessSample, endProcessSample);
+}
+
+//-------------------------------------------
+std::tuple<juce::int64, juce::int64> PluginProcessor::getDetectionRange()
 {
     // where we will be at the end of this block
     juce::int64 endProcessSample = mSamplesProcessed + getBlockSize() - 1; 
     // The end sample index of windowed audio data, but adjusted by lookahead
-    juce::int64 endWindowSample = endProcessSample - MagicNumbers::minLookaheadSize;
-    juce::int64 startWindowSample = endWindowSample - MagicNumbers::minDetectionSize;
-    return std::make_tuple(startWindowSample, endWindowSample);
+    juce::int64 endDetectionSample = endProcessSample - MagicNumbers::minLookaheadSize;
+    juce::int64 startDetectionSample = endDetectionSample - MagicNumbers::minDetectionSize;
+    return std::make_tuple(startDetectionSample, endDetectionSample);
+}
+
+
+//-------------------------------------------
+std::tuple<juce::int64, juce::int64> PluginProcessor::getFirstPeakRange(float detectedPeriod)
+{
+    // where we will be at the end of this block
+    juce::int64 endProcessSample = mSamplesProcessed + getBlockSize() - 1; 
+    juce::int64 endDetectionSample = endProcessSample - MagicNumbers::minLookaheadSize;
+    // The end sample index of windowed audio data, but adjusted by lookahead
+    juce::int64 endFirstPeakRange = endDetectionSample; // 
+    juce::int64 startFirstPeakRange = endFirstPeakRange - (juce::int64)detectedPeriod;
+    return std::make_tuple(startFirstPeakRange, endFirstPeakRange);
 }
 
 //-------------------------------------------
-std::tuple<juce::int64, juce::int64> PluginProcessor::getDelayedDryProcessBlockStartEnd()
+std::tuple<juce::int64, juce::int64> PluginProcessor::getPrecisePeakRange(juce::int64 predictedAnalysisMarker, float detectionPeriod)
 {
     // where we will be at the end of this block
-    juce::int64 startProcessSample = mSamplesProcessed - getBlockSize();
-    juce::int64 endProcessSample = mSamplesProcessed - 1; 
+    juce::int64 radius = (juce::int64)(detectionPeriod * 0.25f);
+    juce::int64 predictedRangeStart = predictedAnalysisMarker - radius;
+    juce::int64 predictedRangeEnd = predictedAnalysisMarker + radius;
+    return std::make_tuple(predictedRangeStart, predictedRangeEnd);
+}
 
-    return std::make_tuple(startProcessSample, endProcessSample);
+//-------------------------------------------
+std::tuple<juce::int64, juce::int64> PluginProcessor::getAnalysisRange(juce::int64 analysisMark, float detectedPeriod)
+{
+    juce::int64 analysisRangeStart = analysisMark - (juce::int64) detectedPeriod;
+    juce::int64 analysisRangeEnd = analysisMark + (juce::int64) detectedPeriod;
+    return std::make_tuple(analysisRangeStart, analysisRangeEnd);
+}
+
+//-------------------------------------------
+std::tuple<juce::int64, juce::int64> PluginProcessor::getDryBlockRange()
+{
+    juce::int64 blockRangeStart = mSamplesProcessed - MagicNumbers::minLookaheadSize;
+    juce::int64 blockRangeEnd = blockRangeStart + getBlockSize();
+    return std::make_tuple(blockRangeStart, blockRangeEnd);
 }
