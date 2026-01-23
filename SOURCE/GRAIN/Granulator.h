@@ -62,8 +62,8 @@ private:
 
 	// Create and activate a new grain
 	void _makeGrain(CircularBuffer& circularBuffer,
-				 		std::tuple<juce::int64, juce::int64> analysisReadRangeInSampleCount, 
-						std::tuple<juce::int64, juce::int64> analysisWriteRangeInSampleCount,
+				 		std::tuple<juce::int64, juce::int64, juce::int64> analysisReadRange,
+						std::tuple<juce::int64, juce::int64, juce::int64> synthRange,
 						float detectedPeriod);
 
 	// Process all active grains, writing to processBlock

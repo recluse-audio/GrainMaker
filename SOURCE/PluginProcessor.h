@@ -95,11 +95,11 @@ public:
     std::unique_ptr<Granulator> mGranulator;
     std::unique_ptr<CircularBuffer> mCircularBuffer;
 	std::unique_ptr<AnalysisMarker> mAnalysisMarker;
-	std::unique_ptr<Window> mWindow;
 
 	juce::AudioBuffer<float> mDetectionBuffer;
 
 	juce::int64 mSamplesProcessed = 0;
+	int mBlockSize = 0;
     juce::int64 mPredictedNextAnalysisMark = (juce::int64) -1;
 
 
