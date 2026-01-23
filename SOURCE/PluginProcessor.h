@@ -69,7 +69,10 @@ public:
 
     std::tuple<juce::int64, juce::int64> getPrecisePeakRange(juce::int64 predictedAnalysisMark, float detectedPeriod);
 
-    std::tuple<juce::int64, juce::int64> getAnalysisRange(juce::int64 analysisMark, float detectedPeriod);
+    std::tuple<juce::int64, juce::int64, juce::int64> getAnalysisReadRange(juce::int64 analysisMark, float detectedPeriod);
+
+    // same as analysisReadRange but offset by minLookaheadSize (undelayed write position)
+    std::tuple<juce::int64, juce::int64, juce::int64> getAnalysisWriteRange(std::tuple<juce::int64, juce::int64, juce::int64> analysisReadRange);
 
     // happens when no pitch is detected and we want to let dry signal back through, but still delayed
     std::tuple<juce::int64, juce::int64> getDryBlockRange();

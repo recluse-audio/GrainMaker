@@ -7,6 +7,8 @@
 
 Grain::Grain()
 {
+	mBuffer.setSize(2, 1024);
+	mBuffer.clear();
 }
 
 Grain::~Grain()
@@ -14,37 +16,17 @@ Grain::~Grain()
 }
 
 //=======================================
-void Grain::prepare(int windowSize)
+void Grain::prepare(int maxGrainSize, int numChannels)
 {
-	mWindow.setSizeShapePeriod(windowSize, Window::Shape::kHanning, windowSize);
-	mWindow.setLooping(true);
-}
-
-//=======================================
-void Grain::setWindowPeriod(int grainSize)
-{
-	mWindow.setPeriod(grainSize);
-	mWindow.resetReadPos();
-}
-
-//=======================================
-void Grain::setWindowPhaseOffset(int sampleOffset)
-{
-	double phaseIncrement = static_cast<double>(mWindow.getSize()) / static_cast<double>(mWindow.getPeriod());
-	mWindow.setReadPos(sampleOffset * phaseIncrement);
-}
-
-//=======================================
-float Grain::getNextWindowSample()
-{
-	return mWindow.getNextSample();
+	mBuffer.setSize(numChannels, maxGrainSize);
+	mBuffer.clear();
 }
 
 //=======================================
 void Grain::reset()
 {
 	isActive = false;
-	mAnalysisRange = { -1, -1 };
-	mSynthRange = { -1, -1 };
-	mWindow.resetReadPos();
+	mAnalysisRange = { -1, -1, -1 };
+	mSynthRange = { -1, -1, -1 };
+	mBuffer.clear();
 }

@@ -212,19 +212,11 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
         peakRangeInCircularBuffer.setEnd(std::get<1>(peakRange));
         juce::int64 markedIndex = mCircularBuffer->findPeakInRange(peakRangeInCircularBuffer);
 
-        auto analysisRange = getAnalysisRange(markedIndex, detected_period);
+        auto analysisReadRange = getAnalysisReadRange(markedIndex, detected_period);
+        auto analysisWriteRange = getAnalysisWriteRange(analysisReadRange);
 
-        mGranulator->processTracking(buffer, *mCircularBuffer.get(), )
+        mGranulator->processTracking(buffer, *mCircularBuffer.get(), analysisReadRange, analysisWriteRange, getProcessCounterRange(), detected_period, shiftedPeriod);
     }
-
-
-    // Granulator has to get process calls even when no pitch detected, so check for valid period ther (period>2)
-    mGranulator->process(buffer,
-                        *mCircularBuffer.get(),
-                        *mAnalysisMarker.get(),
-                        mSamplesProcessed,
-                        detected_period,
-                        shiftedPeriod);
 
 
 	mSamplesProcessed += buffer.getNumSamples();
@@ -385,11 +377,11 @@ std::tuple<juce::int64, juce::int64> PluginProcessor::getPrecisePeakRange(juce::
 }
 
 //-------------------------------------------
-std::tuple<juce::int64, juce::int64> PluginProcessor::getAnalysisRange(juce::int64 analysisMark, float detectedPeriod)
+std::tuple<juce::int64, juce::int64, juce::int64> PluginProcessor::getAnalysisRange(juce::int64 analysisMark, float detectedPeriod)
 {
     juce::int64 analysisRangeStart = analysisMark - (juce::int64) detectedPeriod;
     juce::int64 analysisRangeEnd = analysisMark + (juce::int64) detectedPeriod;
-    return std::make_tuple(analysisRangeStart, analysisRangeEnd);
+    return std::make_tuple(analysisRangeStart, analysisMark, analysisRangeEnd);
 }
 
 //-------------------------------------------
@@ -398,4 +390,13 @@ std::tuple<juce::int64, juce::int64> PluginProcessor::getDryBlockRange()
     juce::int64 blockRangeStart = mSamplesProcessed - MagicNumbers::minLookaheadSize;
     juce::int64 blockRangeEnd = blockRangeStart + getBlockSize();
     return std::make_tuple(blockRangeStart, blockRangeEnd);
+}
+
+//-------------------------------------------
+std::tuple<juce::int64, juce::int64, juce::int64> PluginProcessor::getAnalysisWriteRange(std::tuple<juce::int64, juce::int64, juce::int64> analysisReadRange)
+{
+    juce::int64 writeStart = std::get<0>(analysisReadRange) + MagicNumbers::minLookaheadSize;
+    juce::int64 writeMark = std::get<1>(analysisReadRange) + MagicNumbers::minLookaheadSize;
+    juce::int64 writeEnd = std::get<2>(analysisReadRange) + MagicNumbers::minLookaheadSize;
+    return std::make_tuple(writeStart, writeMark, writeEnd);
 }

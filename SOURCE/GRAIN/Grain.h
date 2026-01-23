@@ -3,12 +3,12 @@
  * Created by Ryan Devens
  *
  * Represents a single grain for TD-PSOLA processing.
- * Each grain owns its own Window for independent windowing.
+ * Each grain owns a buffer that stores pre-windowed audio data.
+ * Windowing is applied by Granulator when the grain is created.
  */
 
 #pragma once
 #include "../Util/Juce_Header.h"
-#include "../SUBMODULES/RD/SOURCE/Window.h"
 
 class Grain
 {
@@ -17,23 +17,21 @@ public:
 	~Grain();
 
 	bool isActive = false;
-	std::tuple<juce::int64, juce::int64> mAnalysisRange { -1, -1 };
-	std::tuple<juce::int64, juce::int64> mSynthRange { -1, -1 };
+	std::tuple<juce::int64, juce::int64, juce::int64> mAnalysisRange { -1, -1, -1 };
+	std::tuple<juce::int64, juce::int64, juce::int64> mSynthRange { -1, -1, -1 };
 
-	// Prepare the grain's window - call once during setup
-	void prepare(int windowSize);
+	// Prepare the grain's buffer - call once during setup
+	void prepare(int maxGrainSize, int numChannels);
 
-	// Configure window for this grain's period and reset read position
-	void setWindowPeriod(int grainSize);
+	// Get read-only access to the grain's buffer
+	const juce::AudioBuffer<float>& getBuffer() const { return mBuffer; }
 
-	// Set window read position based on phase offset (for grains that started before current block)
-	void setWindowPhaseOffset(int sampleOffset);
-
-	// Get next window sample and advance read position
-	float getNextWindowSample();
+	// Get writable access to the grain's buffer (for Granulator to fill)
+	juce::AudioBuffer<float>& getBuffer() { return mBuffer; }
 
 	void reset();
 
 private:
-	Window mWindow;
+	friend class Granulator;
+	juce::AudioBuffer<float> mBuffer;
 };
