@@ -95,7 +95,7 @@ TEST_CASE("PluginProcessor getProcessCounterRange() returns correct sample indic
 	}
 
 
-	SECTION("After 12th processBlock call, range is (1536, 1663)")
+	SECTION("getProcessCounterRange: After 12th processBlock call, range is (1536, 1663)")
 	{
 		auto [start, end] = processor.getProcessCounterRange();
 
@@ -105,5 +105,16 @@ TEST_CASE("PluginProcessor getProcessCounterRange() returns correct sample indic
 		CHECK(start == 1536);
 		CHECK(end == 1663);
 	}
-	
+
+	SECTION("getDetectionRange: After 12th processBlock call, range is (127, 1151)")
+	{
+		auto [start, end] = processor.getDetectionRange();
+
+		// endProcessSample = mSamplesProcessed + mBlockSize - 1 = 1536 + 128 - 1 = 1663
+		// endDetectionSample = endProcessSample - minLookaheadSize = 1663 - 512 = 1151
+		// startDetectionSample = endDetectionSample - minDetectionSize = 1151 - 1024 = 127
+		CHECK(start == 127);
+		CHECK(end == 1151);
+	}
+
 }

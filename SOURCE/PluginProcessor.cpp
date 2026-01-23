@@ -160,62 +160,62 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     [[maybe_unused]] auto totalNumInputChannels  = getTotalNumInputChannels();
     [[maybe_unused]] auto totalNumOutputChannels = getTotalNumOutputChannels();
 
-    // // write audio to circular buffer
-    // bool writeSuccess = mCircularBuffer->pushBuffer(buffer);
-	// if(!writeSuccess)
-	// 	return;
+    // write audio to circular buffer
+    bool writeSuccess = mCircularBuffer->pushBuffer(buffer);
+	if(!writeSuccess)
+		return;
 
-    // // invalid values, bail out
+    // invalid values, bail out
 
-    // // clean up buffers, about to fill
-	// buffer.clear();
-    // mDetectionBuffer.clear();
+    // clean up buffers, about to fill
+	buffer.clear();
+    mDetectionBuffer.clear();
 
-    // ProcessState prevProcessState = mProcessState;
+    ProcessState prevProcessState = mProcessState;
 
-    // // range we will detect on
-    // auto [detectStart, detectEnd] = getDetectionRange();
-    // mCircularBuffer->readRange(mDetectionBuffer, detectStart);
+    // range we will detect on
+    auto [detectStart, detectEnd] = getDetectionRange();
+    mCircularBuffer->readRange(mDetectionBuffer, detectStart);
 
-    // // Try and detect pitch, update state accordingly in temp variable for now
-    // float detected_period = mPitchDetector->process(mDetectionBuffer);
-    // if(detected_period > 2)
-    //     mProcessState = ProcessState::kTracking;
-    // else
-    //     mProcessState = ProcessState::kDetecting;
+    // Try and detect pitch, update state accordingly in temp variable for now
+    float detected_period = mPitchDetector->process(mDetectionBuffer);
+    if(detected_period > 2)
+        mProcessState = ProcessState::kTracking;
+    else
+        mProcessState = ProcessState::kDetecting;
 
-    // auto processCounterRange = getProcessCounterRange();
+    auto processCounterRange = getProcessCounterRange();
 
-    // if(mProcessState == ProcessState::kDetecting)
-    // {
-    //     if(prevProcessState == ProcessState::kTracking)
-    //         mPredictedNextAnalysisMark = -1;
+    if(mProcessState == ProcessState::kDetecting)
+    {
+        if(prevProcessState == ProcessState::kTracking)
+            mPredictedNextAnalysisMark = -1;
 
-    //     auto dryBufferRange = getDryBlockRange();
-    //     mGranulator->processDetecting(buffer, *mCircularBuffer.get(), dryBufferRange, processCounterRange);
-    // }
-    // else if (mProcessState == ProcessState::kTracking)
-    // {
-    //     float shiftedPeriod = detected_period / mShiftRatio;
-    //     std::tuple<juce::int64, juce::int64> peakRange{0, 0};
+        auto dryBufferRange = getDryBlockRange();
+        mGranulator->processDetecting(buffer, *mCircularBuffer.get(), dryBufferRange, processCounterRange);
+    }
+    else if (mProcessState == ProcessState::kTracking)
+    {
+        float shiftedPeriod = detected_period / mShiftRatio;
+        std::tuple<juce::int64, juce::int64> peakRange{0, 0};
 
-    //     // if we just started tracking, we need to find the first peak range 
-    //     if(prevProcessState == ProcessState::kDetecting)
-    //         peakRange = getFirstPeakRange(detected_period);
-    //     else
-    //         peakRange = getPrecisePeakRange(mPredictedNextAnalysisMark, detected_period);
+        // if we just started tracking, we need to find the first peak range 
+        if(prevProcessState == ProcessState::kDetecting)
+            peakRange = getFirstPeakRange(detected_period);
+        else
+            peakRange = getPrecisePeakRange(mPredictedNextAnalysisMark, detected_period);
 
-    //     juce::Range<juce::int64> peakRangeInCircularBuffer;
-    //     peakRangeInCircularBuffer.setStart(std::get<0>(peakRange));
-    //     peakRangeInCircularBuffer.setEnd(std::get<1>(peakRange));
-    //     juce::int64 markedIndex = mCircularBuffer->findPeakInRange(peakRangeInCircularBuffer);
-    //     mPredictedNextAnalysisMark = markedIndex + shiftedPeriod;
+        juce::Range<juce::int64> peakRangeInCircularBuffer;
+        peakRangeInCircularBuffer.setStart(std::get<0>(peakRange));
+        peakRangeInCircularBuffer.setEnd(std::get<1>(peakRange));
+        juce::int64 markedIndex = mCircularBuffer->findPeakInRange(peakRangeInCircularBuffer);
+        mPredictedNextAnalysisMark = markedIndex + shiftedPeriod;
 
-    //     auto analysisReadRange = getAnalysisReadRange(markedIndex, detected_period);
-    //     auto analysisWriteRange = getAnalysisWriteRange(analysisReadRange);
+        auto analysisReadRange = getAnalysisReadRange(markedIndex, detected_period);
+        auto analysisWriteRange = getAnalysisWriteRange(analysisReadRange);
 
-    //     mGranulator->processTracking(buffer, *mCircularBuffer.get(), analysisReadRange, analysisWriteRange, getProcessCounterRange(), detected_period, shiftedPeriod);
-    // }
+        mGranulator->processTracking(buffer, *mCircularBuffer.get(), analysisReadRange, analysisWriteRange, getProcessCounterRange(), detected_period, shiftedPeriod);
+    }
 
 
 	mSamplesProcessed += buffer.getNumSamples();
@@ -379,7 +379,7 @@ std::tuple<juce::int64, juce::int64> PluginProcessor::getPrecisePeakRange(juce::
 std::tuple<juce::int64, juce::int64, juce::int64> PluginProcessor::getAnalysisReadRange(juce::int64 analysisMark, float detectedPeriod)
 {
     juce::int64 analysisRangeStart = analysisMark - (juce::int64) detectedPeriod;
-    juce::int64 analysisRangeEnd = analysisMark + (juce::int64) detectedPeriod;
+    juce::int64 analysisRangeEnd = analysisMark + (juce::int64) detectedPeriod - 1;
     return std::make_tuple(analysisRangeStart, analysisMark, analysisRangeEnd);
 }
 
