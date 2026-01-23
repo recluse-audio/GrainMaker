@@ -101,7 +101,7 @@ void PluginProcessor::changeProgramName (int index, const juce::String& newName)
 void PluginProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
 	// be atleast minLookaheadSize, if at or above, use 2x block size
-	int pitchDetectBufferNumSamples = samplesPerBlock >= MagicNumbers::minDetectionSize ? (samplesPerBlock * 2) : MagicNumbers::minLookaheadSize;
+	int pitchDetectBufferNumSamples = samplesPerBlock >= MagicNumbers::minDetectionSize ? (samplesPerBlock * 2) : MagicNumbers::minDetectionSize;
 	// scale for sample rates, we deal with the same size for 44100 and 48000 for now (same for 88200 and 96000)
 	if(sampleRate > 48000.0 && sampleRate <= 96000.0)
 		pitchDetectBufferNumSamples = pitchDetectBufferNumSamples * 2;
@@ -263,6 +263,13 @@ const float PluginProcessor::getLastDetectedPitch()
 {
     float pitch = static_cast<float>(this->getSampleRate() / mPitchDetector->getCurrentPeriod());
     return pitch;
+}
+
+//===============================================================================
+//
+const float PluginProcessor::getLastDetectedPeriod()
+{
+    return static_cast<float>(mPitchDetector->getCurrentPeriod());
 }
 
 //===============================================================================

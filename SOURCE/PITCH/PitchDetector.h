@@ -2,8 +2,8 @@
 //  Made by Ryan Devens, 2024-07-12 
 //
 
-#define DEFAULT_SAMPLE_RATE 44100
-#define DEFAULT_BUFFER_SIZE 512
+#define DEFAULT_SAMPLE_RATE 48000
+#define DEFAULT_BUFFER_SIZE 1024
 #define DEFAULT_THRESHOLD 0.15
 
 /*
@@ -17,6 +17,7 @@
 #include "Util/Juce_Header.h"
 class PitchDetector
 {
+	friend class PitchDetectorTester;
 public:
 
     PitchDetector();

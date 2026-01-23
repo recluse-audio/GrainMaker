@@ -95,6 +95,15 @@ TEST_CASE("PluginProcessor getProcessCounterRange() returns correct sample indic
 	}
 
 
+	// SECTION("Detected period is approximately 256 samples")
+	// {
+	// 	float expectedPeriod = static_cast<float>(TestConfig::sinePeriod); // 256
+	// 	float detectedPeriod = processor.getLastDetectedPeriod();
+
+	// 	// YIN algorithm may detect slightly different period (e.g., 255.5)
+	// 	CHECK(detectedPeriod == Catch::Approx(expectedPeriod).margin(1.0f));
+	// }
+
 	SECTION("getProcessCounterRange: After 12th processBlock call, range is (1536, 1663)")
 	{
 		auto [start, end] = processor.getProcessCounterRange();
@@ -128,6 +137,20 @@ TEST_CASE("PluginProcessor getProcessCounterRange() returns correct sample indic
 		// startFirstPeakRange = endFirstPeakRange - detectedPeriod = 1151 - 256 = 895
 		CHECK(start == 895);
 		CHECK(end == 1151);
+	}
+
+	SECTION("getAnalysisReadRange: With analysisMark 1000 and period 256, range is (744, 1000, 1255)")
+	{
+		juce::int64 analysisMark = 1000;
+		float detectedPeriod = static_cast<float>(TestConfig::sinePeriod); // 256
+		auto [start, mark, end] = processor.getAnalysisReadRange(analysisMark, detectedPeriod);
+
+		// start = analysisMark - detectedPeriod = 1000 - 256 = 744
+		// mark = analysisMark = 1000
+		// end = analysisMark + detectedPeriod - 1 = 1000 + 256 - 1 = 1255
+		CHECK(start == 744);
+		CHECK(mark == 1000);
+		CHECK(end == 1255);
 	}
 
 }
