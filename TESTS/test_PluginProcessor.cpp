@@ -117,4 +117,17 @@ TEST_CASE("PluginProcessor getProcessCounterRange() returns correct sample indic
 		CHECK(end == 1151);
 	}
 
+	SECTION("getFirstPeakRange: With period 256, range is (895, 1151)")
+	{
+		float detectedPeriod = static_cast<float>(TestConfig::sinePeriod); // 256
+		auto [start, end] = processor.getFirstPeakRange(detectedPeriod);
+
+		// endProcessSample = mSamplesProcessed + mBlockSize - 1 = 1536 + 128 - 1 = 1663
+		// endDetectionSample = endProcessSample - minLookaheadSize = 1663 - 512 = 1151
+		// endFirstPeakRange = endDetectionSample = 1151
+		// startFirstPeakRange = endFirstPeakRange - detectedPeriod = 1151 - 256 = 895
+		CHECK(start == 895);
+		CHECK(end == 1151);
+	}
+
 }
