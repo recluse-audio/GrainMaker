@@ -1,4 +1,8 @@
 set(SOURCES
+    SOURCE/GRAIN/AnalysisMarker.cpp
+    SOURCE/GRAIN/AnalysisMarker.h
+    SOURCE/GRAIN/Grain.cpp
+    SOURCE/GRAIN/Grain.h
     SOURCE/GRAIN/Granulator.cpp
     SOURCE/GRAIN/Granulator.h
     SOURCE/PITCH/PitchDetector.cpp

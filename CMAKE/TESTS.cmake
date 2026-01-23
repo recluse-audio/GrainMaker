@@ -18,4 +18,5 @@ set(TESTS
     TESTS/test_Granulator.cpp
     TESTS/test_PitchDetector.cpp
     TESTS/test_PluginBasics.cpp
+    TESTS/test_PluginProcessor.cpp
 )

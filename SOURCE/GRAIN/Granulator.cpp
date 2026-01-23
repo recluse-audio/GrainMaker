@@ -40,9 +40,9 @@ void Granulator::prepare(double sampleRate, int blockSize, int maxGrainSize)
 
 //=======================================
 void Granulator::processDetecting(juce::AudioBuffer<float>& processBlock, CircularBuffer& circularBuffer,  
-									std::tuple<int, int> dryBlockRange)
+									std::tuple<int, int> dryBlockRange, std::tuple<int, int> processCounterRange)
 {
-	_processActiveGrains(processBlock, circularBuffer, )
+	_processActiveGrains(processBlock, circularBuffer, processCounterRange);
 }
 
 //=======================================
