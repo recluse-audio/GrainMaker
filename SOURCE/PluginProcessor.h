@@ -52,6 +52,7 @@ public:
 	
 	//===================================
     const float getLastDetectedPitch();
+    const float getLastDetectedPeriod();
 
     juce::AudioProcessorValueTreeState& getAPVTS();
 

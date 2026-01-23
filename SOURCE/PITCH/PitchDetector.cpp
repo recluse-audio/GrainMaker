@@ -6,6 +6,7 @@ PitchDetector::PitchDetector()
 {
 	differenceBuffer.setSize(1, DEFAULT_BUFFER_SIZE);
 	cmndBuffer.setSize(1, DEFAULT_BUFFER_SIZE);
+	mThreshold = 0.01f;
 }
 
 //
@@ -39,7 +40,7 @@ float PitchDetector::process(juce::AudioBuffer<float>& buffer)
 
 	BufferMath::yin_normalized_difference(differenceBuffer, cmndBuffer);
 
-	int tauEstimate = BufferMath::yin_absolute_threshold(cmndBuffer, 0.1f);
+	int tauEstimate = BufferMath::yin_absolute_threshold(cmndBuffer, mThreshold);
 
 	if(tauEstimate > 0)
 	{
