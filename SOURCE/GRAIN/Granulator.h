@@ -11,6 +11,7 @@
 #include "Grain.h"
 #include "AnalysisMarker.h"
 #include "../SUBMODULES/RD/SOURCE/CircularBuffer.h"
+#include "../SUBMODULES/RD/SOURCE/Window.h"
 #include <array>
 
 static constexpr int kNumGrains = 4;
@@ -33,13 +34,16 @@ public:
 	// `analysisRange`: Two cycles of detected pitch, delayed by lookahead time, to be read from circular buffer
 	// `synthMark`: Center of 2cycle grain taken from circular buffer (NOT DELAYED)
 	void processTracking(juce::AudioBuffer<float>& processBlock, CircularBuffer& circularBuffer,
-				 		std::tuple<juce::int64, juce::int64> analysisReadRangeInSampleCount, 
-						std::tuple<juce::int64, juce::int64> analysisWriteRangeInSampleCount,
+				 		std::tuple<juce::int64, juce::int64, juce::int64> analysisReadRangeInSampleCount, 
+						std::tuple<juce::int64, juce::int64, juce::int64> analysisWriteRangeInSampleCount,
 						std::tuple<juce::int64, juce::int64> processCounterRange,
 				  		float detectedPeriod,  float shiftedPeriod);
 
+	
+
 private:
 	friend class GranulatorTester;
+	Window mWindow;
 
 	int mBlockSize = 0;
 	int mMaxGrainSize = 0;
