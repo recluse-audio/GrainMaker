@@ -95,14 +95,14 @@ TEST_CASE("PluginProcessor getProcessCounterRange() returns correct sample indic
 	}
 
 
-	// SECTION("Detected period is approximately 256 samples")
-	// {
-	// 	float expectedPeriod = static_cast<float>(TestConfig::sinePeriod); // 256
-	// 	float detectedPeriod = processor.getLastDetectedPeriod();
+	SECTION("Detected period is approximately 256 samples")
+	{
+		float expectedPeriod = static_cast<float>(TestConfig::sinePeriod); // 256
+		float detectedPeriod = processor.getLastDetectedPeriod();
 
-	// 	// YIN algorithm may detect slightly different period (e.g., 255.5)
-	// 	CHECK(detectedPeriod == Catch::Approx(expectedPeriod).margin(1.0f));
-	// }
+		// YIN algorithm may detect slightly different period (e.g., 255.5)
+		CHECK(detectedPeriod == Catch::Approx(expectedPeriod).margin(1.0f));
+	}
 
 	SECTION("getProcessCounterRange: After 12th processBlock call, range is (1536, 1663)")
 	{
@@ -151,6 +151,58 @@ TEST_CASE("PluginProcessor getProcessCounterRange() returns correct sample indic
 		CHECK(start == 744);
 		CHECK(mark == 1000);
 		CHECK(end == 1255);
+	}
+
+	SECTION("getAnalysisWriteRange: With analysisReadRange (744, 1000, 1255), range is (1536, 1792, 2047)")
+	{
+		// Get the read range first
+		juce::int64 analysisMark = 1000;
+		float detectedPeriod = static_cast<float>(TestConfig::sinePeriod); // 256
+		auto analysisReadRange = processor.getAnalysisReadRange(analysisMark, detectedPeriod);
+
+		auto [start, mark, end] = processor.getAnalysisWriteRange(analysisReadRange);
+
+		// Write range is read range offset so start aligns with processBlock start (1536)
+		// offset = processBlockStart - readRangeStart = 1536 - 744 = 792
+		// start = 744 + 792 = 1536
+		// mark = 1000 + 792 = 1792
+		// end = 1255 + 792 = 2047
+		CHECK(start == 1536);
+		CHECK(mark == 1792);
+		CHECK(end == 2047);
+	}
+
+	SECTION("getPrecisePeakRange: With predictedAnalysisMark 1256 and period 256, after 14th processBlock")
+	{
+		// Process one additional block (14th call)
+		// After 13th call: mSamplesProcessed = 1664, processCounterRange = (1664, 1791)
+		int sourceStartSample = (TestConfig::numProcessCalls * TestConfig::blockSize) % TestConfig::sineBufferSize;
+		for (int ch = 0; ch < TestConfig::numChannels; ++ch)
+		{
+			for (int sample = 0; sample < TestConfig::blockSize; ++sample)
+			{
+				int sourceIndex = (sourceStartSample + sample) % TestConfig::sineBufferSize;
+				processBuffer.setSample(ch, sample, sineBuffer.getSample(ch, sourceIndex));
+			}
+		}
+		processor.processBlock(processBuffer, midiBuffer);
+
+		// Now at 14th call: mSamplesProcessed = 1664
+		// processCounterRange = (1664, 1791)
+		// detectionRange: end = 1791 - 512 = 1279, start = 1279 - 1024 = 255
+		// So detectionRange = (255, 1279)
+
+		// Predicted analysis mark from previous detection (1000 + 256 = 1256)
+		juce::int64 predictedAnalysisMark = 1256;
+		float detectedPeriod = static_cast<float>(TestConfig::sinePeriod); // 256
+
+		auto [start, end] = processor.getPrecisePeakRange(predictedAnalysisMark, detectedPeriod);
+
+		// getPrecisePeakRange should return a range centered around the predicted mark
+		// start = predictedAnalysisMark - detectedPeriod = 1256 - 256 = 1000
+		// end = predictedAnalysisMark = 1256
+		CHECK(start == 1000);
+		CHECK(end == 1256);
 	}
 
 }

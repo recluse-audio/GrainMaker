@@ -39,23 +39,17 @@ public:
 						std::tuple<juce::int64, juce::int64> processCounterRange,
 				  		float detectedPeriod,  float shiftedPeriod);
 
-	
-
+	std::array<Grain, kNumGrains>& getGrains() { return mGrains; }
+	juce::int64 getSynthMark() const { return mSynthMark; }
+	Window& getWindow() { return mWindow; }
 private:
 	friend class GranulatorTester;
 	Window mWindow;
-
-	int mBlockSize = 0;
-	int mMaxGrainSize = 0;
-	double mSampleRate = 44100.0;
 
 	std::array<Grain, kNumGrains> mGrains;
 
 	// Tracks when to create the next grain
 	juce::int64 mSynthMark = -1;
-
-	// Pre-allocated buffer for reading grain data from circular buffer
-	juce::AudioBuffer<float> mGrainReadBuffer;
 
 	// Find an inactive grain slot, returns -1 if none available
 	int _findInactiveGrainIndex();

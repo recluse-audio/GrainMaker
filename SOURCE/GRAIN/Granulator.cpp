@@ -16,13 +16,6 @@ Granulator::~Granulator()
 //=======================================
 void Granulator::prepare(double sampleRate, int blockSize, int maxGrainSize)
 {
-	mSampleRate = sampleRate;
-	mBlockSize = blockSize;
-	mMaxGrainSize = maxGrainSize;
-
-	// Pre-allocate grain read buffer (2 * period for full grain)
-	mGrainReadBuffer.setSize(2, maxGrainSize);
-	mGrainReadBuffer.clear();
 
 	// Configure the shared window
 	mWindow.setSizeShapePeriod(static_cast<int>(sampleRate), Window::Shape::kHanning, maxGrainSize);
