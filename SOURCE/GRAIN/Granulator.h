@@ -42,6 +42,17 @@ public:
 	std::array<Grain, kNumGrains>& getGrains() { return mGrains; }
 	juce::int64 getSynthMark() const { return mSynthMark; }
 	Window& getWindow() { return mWindow; }
+
+	// Create and activate a new grain
+	void makeGrain(CircularBuffer& circularBuffer,
+				   std::tuple<juce::int64, juce::int64, juce::int64> analysisReadRange,
+				   std::tuple<juce::int64, juce::int64, juce::int64> synthRange,
+				   float detectedPeriod);
+
+	// Process all active grains, writing to processBlock
+	void processActiveGrains(juce::AudioBuffer<float>& processBlock,
+							 std::tuple<juce::int64, juce::int64> processCounterRange);
+
 private:
 	friend class GranulatorTester;
 	Window mWindow;
@@ -53,16 +64,6 @@ private:
 
 	// Find an inactive grain slot, returns -1 if none available
 	int _findInactiveGrainIndex();
-
-	// Create and activate a new grain
-	void _makeGrain(CircularBuffer& circularBuffer,
-				 		std::tuple<juce::int64, juce::int64, juce::int64> analysisReadRange,
-						std::tuple<juce::int64, juce::int64, juce::int64> synthRange,
-						float detectedPeriod);
-
-	// Process all active grains, writing to processBlock
-	void _processActiveGrains(juce::AudioBuffer<float>& processBlock,  CircularBuffer& circularBuffer,
-								std::tuple<juce::int64, juce::int64> processCounterRange);
 	
 	// Calculate next synthesis start index
 	void _updateNextSynthStartIndex(float shiftedPeriod);
