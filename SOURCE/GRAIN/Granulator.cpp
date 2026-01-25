@@ -32,10 +32,10 @@ void Granulator::prepare(double sampleRate, int blockSize, int maxGrainSize)
 
 
 //=======================================
-void Granulator::processDetecting(juce::AudioBuffer<float>& processBlock, CircularBuffer& circularBuffer,  
+void Granulator::processDetecting(juce::AudioBuffer<float>& processBlock, CircularBuffer& circularBuffer,
 									std::tuple<int, int> dryBlockRange, std::tuple<int, int> processCounterRange)
 {
-	_processActiveGrains(processBlock, circularBuffer, processCounterRange);
+	processActiveGrains(processBlock, processCounterRange);
 }
 
 //=======================================
@@ -67,16 +67,15 @@ void Granulator::processTracking(juce::AudioBuffer<float>& processBlock, Circula
 		juce::int64 synthEnd = mSynthMark + (juce::int64)detectedPeriod - 1;
 		std::tuple<juce::int64, juce::int64, juce::int64> synthRangeInSampleCount = {synthStart, mSynthMark, synthEnd};
 
-		_makeGrain(circularBuffer, analysisReadRangeInSampleCount, synthRangeInSampleCount, detectedPeriod);
+		makeGrain(circularBuffer, analysisReadRangeInSampleCount, synthRangeInSampleCount, detectedPeriod);
 
 		mSynthMark = mSynthMark + (juce::int64)shiftedPeriod; // IMPORTANT TO USE SHIFTED HERE
 	}
 
 
 
-	// 
 	// Process all active grains
-	_processActiveGrains(processBlock, circularBuffer, processCounterRange);
+	processActiveGrains(processBlock, processCounterRange);
 }
 
 //=======================================
@@ -91,7 +90,7 @@ int Granulator::_findInactiveGrainIndex()
 }
 
 //=======================================
-void Granulator::_makeGrain(CircularBuffer& circularBuffer,
+void Granulator::makeGrain(CircularBuffer& circularBuffer,
 				 		std::tuple<juce::int64, juce::int64, juce::int64> analysisReadRange,
 						std::tuple<juce::int64, juce::int64, juce::int64> synthRange,
 						float detectedPeriod)
@@ -134,7 +133,7 @@ void Granulator::_makeGrain(CircularBuffer& circularBuffer,
 }
 
 //=======================================
-void Granulator::_processActiveGrains(juce::AudioBuffer<float>& processBlock,  CircularBuffer& circularBuffer,
+void Granulator::processActiveGrains(juce::AudioBuffer<float>& processBlock,
 								std::tuple<juce::int64, juce::int64> processCounterRange)
 {
 	int numChannels = processBlock.getNumChannels();
