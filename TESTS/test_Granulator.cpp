@@ -707,6 +707,279 @@ TEST_CASE("Granulator processTracking() with pitch shift up creates multiple gra
 
 //=======================================================================================
 //=======================================================================================
+// GRAIN BUFFER VERIFICATION AROUND 4096 BOUNDARY
+//=======================================================================================
+/**
+ * Test that grain buffers are filled correctly when sample indices approach 4096.
+ *
+ * The circular buffer is 2048 samples. At sample ~4096 (2 * buffer size), we've
+ * wrapped around twice. This test verifies that:
+ * 1. makeGrain correctly reads from the circular buffer when indices wrap
+ * 2. The grain buffer contains the expected audio data
+ * 3. Grains are created at the expected times
+ *
+ * This tests the specific scenario where audio dropout was occurring.
+ */
+TEST_CASE("Granulator makeGrain() fills grain buffer correctly near 4096 sample boundary", "[Granulator][makeGrain][boundary]")
+{
+	constexpr double sampleRate = 48000.0;
+	constexpr int blockSize = 128;
+	constexpr int circularBufferSize = 2048;
+	constexpr float detectedPeriod = 256.0f;
+	constexpr int grainSize = static_cast<int>(detectedPeriod * 2); // 512
+
+	// Create and prepare Granulator
+	Granulator granulator;
+	granulator.prepare(sampleRate, blockSize, grainSize);
+
+	// Create CircularBuffer and fill with incremental values so we can verify reads
+	CircularBuffer circularBuffer;
+	circularBuffer.setSize(2, circularBufferSize);
+
+	// Fill buffer with values that encode the sample index modulo buffer size
+	// This lets us verify which positions are being read
+	juce::AudioBuffer<float> incrementalBuffer(2, circularBufferSize);
+	for (int i = 0; i < circularBufferSize; ++i)
+	{
+		float value = static_cast<float>(i);
+		incrementalBuffer.setSample(0, i, value);
+		incrementalBuffer.setSample(1, i, value);
+	}
+	circularBuffer.pushBuffer(incrementalBuffer);
+
+	// Use no windowing so we can verify exact values
+	granulator.getWindow().setSizeShapePeriod(static_cast<int>(sampleRate), Window::Shape::kNone, grainSize);
+
+	SECTION("makeGrain at sample 3200 (before 4096 boundary)")
+	{
+		// analysisReadRange centered at 3200: (3200-256, 3200, 3200+255) = (2944, 3200, 3455)
+		// These wrap to buffer indices: (896, 1152, 1407)
+		std::tuple<juce::int64, juce::int64, juce::int64> analysisReadRange = {2944, 3200, 3455};
+		std::tuple<juce::int64, juce::int64, juce::int64> synthRange = {3456, 3712, 3967};
+
+		granulator.makeGrain(circularBuffer, analysisReadRange, synthRange, detectedPeriod);
+
+		// Verify grain was created
+		auto& grains = granulator.getGrains();
+		REQUIRE(grains[0].isActive == true);
+
+		// Verify grain buffer contains values matching wrapped circular buffer indices
+		const auto& grainBuffer = grains[0].getBuffer();
+		bool allCorrect = true;
+		for (int i = 0; i < grainSize && allCorrect; ++i)
+		{
+			juce::int64 readIndex = 2944 + i;
+			int expectedWrappedIndex = static_cast<int>(readIndex % circularBufferSize);
+			float expectedValue = static_cast<float>(expectedWrappedIndex);
+			float actualValue = grainBuffer.getSample(0, i);
+
+			if (actualValue != expectedValue)
+			{
+				INFO("Grain buffer mismatch at grain index " << i
+					 << ": readIndex=" << readIndex
+					 << ", expectedWrappedIndex=" << expectedWrappedIndex
+					 << ", expected=" << expectedValue
+					 << ", actual=" << actualValue);
+				allCorrect = false;
+			}
+		}
+		CHECK(allCorrect);
+	}
+
+	SECTION("makeGrain at sample 3900 (range spans 4096 boundary)")
+	{
+		// analysisReadRange centered at 3900: (3900-256, 3900, 3900+255) = (3644, 3900, 4155)
+		// 3644 % 2048 = 1596
+		// 3900 % 2048 = 1852
+		// 4155 % 2048 = 59  (wraps around!)
+		std::tuple<juce::int64, juce::int64, juce::int64> analysisReadRange = {3644, 3900, 4155};
+		std::tuple<juce::int64, juce::int64, juce::int64> synthRange = {4156, 4412, 4667};
+
+		granulator.makeGrain(circularBuffer, analysisReadRange, synthRange, detectedPeriod);
+
+		// Verify grain was created
+		auto& grains = granulator.getGrains();
+		REQUIRE(grains[0].isActive == true);
+
+		// Verify grain buffer handles the wrap correctly
+		const auto& grainBuffer = grains[0].getBuffer();
+		bool allCorrect = true;
+		int mismatchCount = 0;
+		for (int i = 0; i < grainSize; ++i)
+		{
+			juce::int64 readIndex = 3644 + i;
+			int expectedWrappedIndex = static_cast<int>(((readIndex % circularBufferSize) + circularBufferSize) % circularBufferSize);
+			float expectedValue = static_cast<float>(expectedWrappedIndex);
+			float actualValue = grainBuffer.getSample(0, i);
+
+			if (actualValue != expectedValue)
+			{
+				if (mismatchCount < 5) // Only print first 5 mismatches
+				{
+					INFO("Grain buffer mismatch at grain index " << i
+						 << ": readIndex=" << readIndex
+						 << ", expectedWrappedIndex=" << expectedWrappedIndex
+						 << ", expected=" << expectedValue
+						 << ", actual=" << actualValue);
+				}
+				allCorrect = false;
+				mismatchCount++;
+			}
+		}
+		if (mismatchCount > 0)
+		{
+			INFO("Total mismatches: " << mismatchCount << " / " << grainSize);
+		}
+		CHECK(allCorrect);
+	}
+
+	SECTION("makeGrain at sample 4100 (entirely past 4096 boundary)")
+	{
+		// analysisReadRange centered at 4100: (4100-256, 4100, 4100+255) = (3844, 4100, 4355)
+		// 3844 % 2048 = 1796
+		// 4100 % 2048 = 4
+		// 4355 % 2048 = 259
+		std::tuple<juce::int64, juce::int64, juce::int64> analysisReadRange = {3844, 4100, 4355};
+		std::tuple<juce::int64, juce::int64, juce::int64> synthRange = {4356, 4612, 4867};
+
+		granulator.makeGrain(circularBuffer, analysisReadRange, synthRange, detectedPeriod);
+
+		auto& grains = granulator.getGrains();
+		REQUIRE(grains[0].isActive == true);
+
+		const auto& grainBuffer = grains[0].getBuffer();
+		bool allCorrect = true;
+		int mismatchCount = 0;
+		for (int i = 0; i < grainSize; ++i)
+		{
+			juce::int64 readIndex = 3844 + i;
+			int expectedWrappedIndex = static_cast<int>(((readIndex % circularBufferSize) + circularBufferSize) % circularBufferSize);
+			float expectedValue = static_cast<float>(expectedWrappedIndex);
+			float actualValue = grainBuffer.getSample(0, i);
+
+			if (actualValue != expectedValue)
+			{
+				if (mismatchCount < 5)
+				{
+					INFO("Grain buffer mismatch at grain index " << i
+						 << ": readIndex=" << readIndex
+						 << ", expectedWrappedIndex=" << expectedWrappedIndex
+						 << ", expected=" << expectedValue
+						 << ", actual=" << actualValue);
+				}
+				allCorrect = false;
+				mismatchCount++;
+			}
+		}
+		if (mismatchCount > 0)
+		{
+			INFO("Total mismatches: " << mismatchCount << " / " << grainSize);
+		}
+		CHECK(allCorrect);
+	}
+}
+
+/**
+ * Test that processTracking creates grains at the correct times around the 4096 boundary.
+ *
+ * This verifies that the grain emission logic works correctly when sample counts
+ * approach and pass 2 * circular buffer size.
+ */
+TEST_CASE("Granulator processTracking() creates grains correctly near 4096 boundary", "[Granulator][processTracking][boundary]")
+{
+	constexpr double sampleRate = 48000.0;
+	constexpr int blockSize = 128;
+	constexpr int circularBufferSize = 2048;
+	constexpr float detectedPeriod = 256.0f;
+	constexpr float shiftedPeriod = 256.0f;
+	constexpr int grainSize = static_cast<int>(detectedPeriod * 2);
+
+	Granulator granulator;
+	granulator.prepare(sampleRate, blockSize, grainSize);
+
+	CircularBuffer circularBuffer;
+	circularBuffer.setSize(2, circularBufferSize);
+	juce::AudioBuffer<float> sineBuffer(2, circularBufferSize);
+	BufferFiller::generateSineCycles(sineBuffer, static_cast<int>(detectedPeriod));
+	circularBuffer.pushBuffer(sineBuffer);
+
+	juce::AudioBuffer<float> processBuffer(2, blockSize);
+
+	auto countActiveGrains = [&granulator]() {
+		int count = 0;
+		for (const auto& grain : granulator.getGrains())
+			if (grain.isActive) count++;
+		return count;
+	};
+
+	SECTION("Track grain creation across multiple blocks spanning 4096")
+	{
+		// Simulate processing from block 28 to block 35 (samples 3456 to 4480)
+		// This spans the critical 4096 boundary
+
+		std::vector<int> grainCountPerBlock;
+		std::vector<juce::int64> synthMarksPerBlock;
+
+		for (int block = 28; block <= 35; ++block)
+		{
+			processBuffer.clear();
+
+			// Calculate ranges as PluginProcessor would
+			juce::int64 samplesProcessed = (block - 1) * blockSize;
+			juce::int64 processStart = samplesProcessed;
+			juce::int64 processEnd = samplesProcessed + blockSize - 1;
+
+			// Detection happens at delayed position
+			juce::int64 detectionEnd = processEnd - 512; // minLookaheadSize
+			juce::int64 detectionStart = detectionEnd - 1024; // minDetectionSize
+
+			// Mock analysis mark somewhere in detection range
+			juce::int64 analysisMark = detectionEnd - 128; // Arbitrary position
+			juce::int64 analysisStart = analysisMark - static_cast<juce::int64>(detectedPeriod);
+			juce::int64 analysisEnd = analysisMark + static_cast<juce::int64>(detectedPeriod) - 1;
+
+			// Write range = read range + lookahead
+			juce::int64 writeStart = analysisStart + 512;
+			juce::int64 writeMark = analysisMark + 512;
+			juce::int64 writeEnd = analysisEnd + 512;
+
+			std::tuple<juce::int64, juce::int64, juce::int64> analysisReadRange = {analysisStart, analysisMark, analysisEnd};
+			std::tuple<juce::int64, juce::int64, juce::int64> analysisWriteRange = {writeStart, writeMark, writeEnd};
+			std::tuple<juce::int64, juce::int64> processCounterRange = {processStart, processEnd};
+
+			granulator.processTracking(processBuffer, circularBuffer,
+									   analysisReadRange, analysisWriteRange,
+									   processCounterRange,
+									   detectedPeriod, shiftedPeriod);
+
+			grainCountPerBlock.push_back(countActiveGrains());
+			synthMarksPerBlock.push_back(granulator.getSynthMark());
+
+			INFO("Block " << block << " (samples " << processStart << "-" << processEnd << "):"
+				 << " activeGrains=" << countActiveGrains()
+				 << " synthMark=" << granulator.getSynthMark()
+				 << " writeMark=" << writeMark);
+		}
+
+		// Verify grains are being created consistently
+		// Should have at least 1 grain active after each block
+		for (size_t i = 0; i < grainCountPerBlock.size(); ++i)
+		{
+			INFO("Block " << (28 + i) << " had " << grainCountPerBlock[i] << " active grains");
+			CHECK(grainCountPerBlock[i] >= 1);
+		}
+
+		// Verify synthMark is progressing (not stuck or jumping backwards)
+		for (size_t i = 1; i < synthMarksPerBlock.size(); ++i)
+		{
+			INFO("synthMark progression: " << synthMarksPerBlock[i-1] << " -> " << synthMarksPerBlock[i]);
+			CHECK(synthMarksPerBlock[i] >= synthMarksPerBlock[i-1]);
+		}
+	}
+}
+
+//=======================================================================================
+//=======================================================================================
 // PROCESS ACTIVE GRAINS TESTS
 //=======================================================================================
 /**
@@ -747,4 +1020,366 @@ TEST_CASE("Granulator processActiveGrains() with no active grains leaves buffer 
 			CHECK(processBuffer.getSample(ch, i) == 0.0f);
 		}
 	}
+}
+
+/**
+ * Test processActiveGrains() with a single active grain.
+ *
+ * Verifies that a single grain correctly writes its windowed samples
+ * to the process buffer at the correct positions.
+ */
+TEST_CASE("Granulator processActiveGrains() with single active grain", "[Granulator][processActiveGrains]")
+{
+	constexpr double sampleRate = 48000.0;
+	constexpr int blockSize = 128;
+	constexpr int circularBufferSize = 2048;
+	constexpr float detectedPeriod = 256.0f;
+	constexpr int grainSize = static_cast<int>(detectedPeriod * 2); // 512
+
+	Granulator granulator;
+	granulator.prepare(sampleRate, blockSize, grainSize);
+
+	// Use no windowing for predictable values
+	granulator.getWindow().setSizeShapePeriod(static_cast<int>(sampleRate), Window::Shape::kNone, grainSize);
+
+	// Create CircularBuffer with all ones
+	CircularBuffer circularBuffer;
+	circularBuffer.setSize(2, circularBufferSize);
+	juce::AudioBuffer<float> onesBuffer(2, circularBufferSize);
+	BufferFiller::fillWithAllOnes(onesBuffer);
+	circularBuffer.pushBuffer(onesBuffer);
+
+	// Create a grain manually
+	std::tuple<juce::int64, juce::int64, juce::int64> analysisReadRange = {0, 256, 511};
+	std::tuple<juce::int64, juce::int64, juce::int64> synthRange = {100, 356, 611}; // Grain spans samples 100-611
+
+	granulator.makeGrain(circularBuffer, analysisReadRange, synthRange, detectedPeriod);
+
+	auto& grains = granulator.getGrains();
+	REQUIRE(grains[0].isActive == true);
+
+	SECTION("Block fully within grain: processCounterRange (200, 327)")
+	{
+		juce::AudioBuffer<float> processBuffer(2, blockSize);
+		processBuffer.clear();
+
+		std::tuple<juce::int64, juce::int64> processCounterRange = {200, 327};
+		granulator.processActiveGrains(processBuffer, processCounterRange);
+
+		// All samples should have grain data written (value 1.0 with no window)
+		int nonZeroCount = 0;
+		for (int i = 0; i < blockSize; ++i)
+		{
+			if (processBuffer.getSample(0, i) != 0.0f)
+				nonZeroCount++;
+		}
+		CHECK(nonZeroCount == blockSize);
+
+		// Grain should still be active (not fully processed)
+		CHECK(grains[0].isActive == true);
+	}
+}
+
+/**
+ * Test processActiveGrains() when grain starts before block and ends inside it.
+ *
+ * Grain: synthRange (100, 356, 611) - spans samples 100-611
+ * Block: processCounterRange (500, 627) - spans samples 500-627
+ *
+ * Expected: Grain ends at 611, block ends at 627
+ * - Samples 500-611 should have grain data (112 samples)
+ * - Samples 612-627 should be zero (16 samples)
+ * - Grain should be deactivated after processing
+ */
+TEST_CASE("Granulator processActiveGrains() grain ends mid-block", "[Granulator][processActiveGrains]")
+{
+	constexpr double sampleRate = 48000.0;
+	constexpr int blockSize = 128;
+	constexpr int circularBufferSize = 2048;
+	constexpr float detectedPeriod = 256.0f;
+	constexpr int grainSize = static_cast<int>(detectedPeriod * 2); // 512
+
+	Granulator granulator;
+	granulator.prepare(sampleRate, blockSize, grainSize);
+	granulator.getWindow().setSizeShapePeriod(static_cast<int>(sampleRate), Window::Shape::kNone, grainSize);
+
+	CircularBuffer circularBuffer;
+	circularBuffer.setSize(2, circularBufferSize);
+	juce::AudioBuffer<float> onesBuffer(2, circularBufferSize);
+	BufferFiller::fillWithAllOnes(onesBuffer);
+	circularBuffer.pushBuffer(onesBuffer);
+
+	// Grain spans samples 100-611
+	std::tuple<juce::int64, juce::int64, juce::int64> analysisReadRange = {0, 256, 511};
+	std::tuple<juce::int64, juce::int64, juce::int64> synthRange = {100, 356, 611};
+
+	granulator.makeGrain(circularBuffer, analysisReadRange, synthRange, detectedPeriod);
+
+	auto& grains = granulator.getGrains();
+	REQUIRE(grains[0].isActive == true);
+
+	juce::AudioBuffer<float> processBuffer(2, blockSize);
+	processBuffer.clear();
+
+	// Block spans 500-627, grain ends at 611
+	std::tuple<juce::int64, juce::int64> processCounterRange = {500, 627};
+	granulator.processActiveGrains(processBuffer, processCounterRange);
+
+	// Count samples with grain data
+	// Overlap is samples 500-611 = 112 samples (indices 0-111 in processBuffer)
+	int samplesWithData = 0;
+	int samplesWithoutData = 0;
+	for (int i = 0; i < blockSize; ++i)
+	{
+		juce::int64 sampleIndex = 500 + i;
+		if (sampleIndex <= 611)
+		{
+			// Should have grain data
+			if (processBuffer.getSample(0, i) != 0.0f)
+				samplesWithData++;
+		}
+		else
+		{
+			// Should be zero
+			if (processBuffer.getSample(0, i) == 0.0f)
+				samplesWithoutData++;
+		}
+	}
+
+	INFO("Samples with data: " << samplesWithData << " (expected 112)");
+	INFO("Samples without data: " << samplesWithoutData << " (expected 16)");
+	CHECK(samplesWithData == 112);
+	CHECK(samplesWithoutData == 16);
+
+	// Grain should be deactivated (synthEnd 611 <= blockEnd 627)
+	CHECK(grains[0].isActive == false);
+}
+
+/**
+ * Test processActiveGrains() when grain starts mid-block and continues past it.
+ *
+ * Grain: synthRange (550, 806, 1061) - spans samples 550-1061
+ * Block: processCounterRange (500, 627) - spans samples 500-627
+ *
+ * Expected: Grain starts at 550, block starts at 500
+ * - Samples 500-549 should be zero (50 samples)
+ * - Samples 550-627 should have grain data (78 samples)
+ * - Grain should remain active (continues past block)
+ */
+TEST_CASE("Granulator processActiveGrains() grain starts mid-block", "[Granulator][processActiveGrains]")
+{
+	constexpr double sampleRate = 48000.0;
+	constexpr int blockSize = 128;
+	constexpr int circularBufferSize = 2048;
+	constexpr float detectedPeriod = 256.0f;
+	constexpr int grainSize = static_cast<int>(detectedPeriod * 2); // 512
+
+	Granulator granulator;
+	granulator.prepare(sampleRate, blockSize, grainSize);
+	granulator.getWindow().setSizeShapePeriod(static_cast<int>(sampleRate), Window::Shape::kNone, grainSize);
+
+	CircularBuffer circularBuffer;
+	circularBuffer.setSize(2, circularBufferSize);
+	juce::AudioBuffer<float> onesBuffer(2, circularBufferSize);
+	BufferFiller::fillWithAllOnes(onesBuffer);
+	circularBuffer.pushBuffer(onesBuffer);
+
+	// Grain spans samples 550-1061
+	std::tuple<juce::int64, juce::int64, juce::int64> analysisReadRange = {0, 256, 511};
+	std::tuple<juce::int64, juce::int64, juce::int64> synthRange = {550, 806, 1061};
+
+	granulator.makeGrain(circularBuffer, analysisReadRange, synthRange, detectedPeriod);
+
+	auto& grains = granulator.getGrains();
+	REQUIRE(grains[0].isActive == true);
+
+	juce::AudioBuffer<float> processBuffer(2, blockSize);
+	processBuffer.clear();
+
+	// Block spans 500-627, grain starts at 550
+	std::tuple<juce::int64, juce::int64> processCounterRange = {500, 627};
+	granulator.processActiveGrains(processBuffer, processCounterRange);
+
+	// Count samples
+	// Before grain (500-549): 50 samples should be zero
+	// Overlap (550-627): 78 samples should have data
+	int samplesBeforeGrain = 0;
+	int samplesWithData = 0;
+	for (int i = 0; i < blockSize; ++i)
+	{
+		juce::int64 sampleIndex = 500 + i;
+		if (sampleIndex < 550)
+		{
+			if (processBuffer.getSample(0, i) == 0.0f)
+				samplesBeforeGrain++;
+		}
+		else
+		{
+			if (processBuffer.getSample(0, i) != 0.0f)
+				samplesWithData++;
+		}
+	}
+
+	INFO("Samples before grain (zero): " << samplesBeforeGrain << " (expected 50)");
+	INFO("Samples with data: " << samplesWithData << " (expected 78)");
+	CHECK(samplesBeforeGrain == 50);
+	CHECK(samplesWithData == 78);
+
+	// Grain should remain active (synthEnd 1061 > blockEnd 627)
+	CHECK(grains[0].isActive == true);
+}
+
+/**
+ * Test processActiveGrains() when grain starts and ends within one block.
+ *
+ * Using a smaller grain size to fit within one block.
+ * Grain: synthRange (520, 584, 647) - spans samples 520-647 (128 samples, using period 64)
+ * Block: processCounterRange (500, 700) - spans samples 500-700 (201 samples)
+ *
+ * Expected:
+ * - Samples 500-519 should be zero (20 samples)
+ * - Samples 520-647 should have grain data (128 samples)
+ * - Samples 648-700 should be zero (53 samples)
+ * - Grain should be deactivated
+ */
+TEST_CASE("Granulator processActiveGrains() grain starts and ends within block", "[Granulator][processActiveGrains]")
+{
+	constexpr double sampleRate = 48000.0;
+	constexpr int blockSize = 201; // Larger block to contain entire grain
+	constexpr int circularBufferSize = 2048;
+	constexpr float detectedPeriod = 64.0f; // Smaller period for smaller grain
+	constexpr int grainSize = static_cast<int>(detectedPeriod * 2); // 128
+
+	Granulator granulator;
+	granulator.prepare(sampleRate, blockSize, grainSize);
+	granulator.getWindow().setSizeShapePeriod(static_cast<int>(sampleRate), Window::Shape::kNone, grainSize);
+
+	CircularBuffer circularBuffer;
+	circularBuffer.setSize(2, circularBufferSize);
+	juce::AudioBuffer<float> onesBuffer(2, circularBufferSize);
+	BufferFiller::fillWithAllOnes(onesBuffer);
+	circularBuffer.pushBuffer(onesBuffer);
+
+	// Grain spans samples 520-647 (128 samples)
+	std::tuple<juce::int64, juce::int64, juce::int64> analysisReadRange = {0, 64, 127};
+	std::tuple<juce::int64, juce::int64, juce::int64> synthRange = {520, 584, 647};
+
+	granulator.makeGrain(circularBuffer, analysisReadRange, synthRange, detectedPeriod);
+
+	auto& grains = granulator.getGrains();
+	REQUIRE(grains[0].isActive == true);
+
+	juce::AudioBuffer<float> processBuffer(2, blockSize);
+	processBuffer.clear();
+
+	// Block spans 500-700
+	std::tuple<juce::int64, juce::int64> processCounterRange = {500, 700};
+	granulator.processActiveGrains(processBuffer, processCounterRange);
+
+	// Count samples in each region
+	int samplesBeforeGrain = 0;  // 500-519
+	int samplesWithData = 0;     // 520-647
+	int samplesAfterGrain = 0;   // 648-700
+
+	for (int i = 0; i < blockSize; ++i)
+	{
+		juce::int64 sampleIndex = 500 + i;
+		float sample = processBuffer.getSample(0, i);
+
+		if (sampleIndex < 520)
+		{
+			if (sample == 0.0f) samplesBeforeGrain++;
+		}
+		else if (sampleIndex <= 647)
+		{
+			if (sample != 0.0f) samplesWithData++;
+		}
+		else
+		{
+			if (sample == 0.0f) samplesAfterGrain++;
+		}
+	}
+
+	INFO("Samples before grain (zero): " << samplesBeforeGrain << " (expected 20)");
+	INFO("Samples with data: " << samplesWithData << " (expected 128)");
+	INFO("Samples after grain (zero): " << samplesAfterGrain << " (expected 53)");
+	CHECK(samplesBeforeGrain == 20);
+	CHECK(samplesWithData == 128);
+	CHECK(samplesAfterGrain == 53);
+
+	// Grain should be deactivated
+	CHECK(grains[0].isActive == false);
+}
+
+/**
+ * Test processActiveGrains() with two overlapping grains.
+ *
+ * Grain 1: synthRange (100, 356, 611) - spans samples 100-611
+ * Grain 2: synthRange (300, 556, 811) - spans samples 300-811
+ * Block: processCounterRange (400, 527) - spans samples 400-527
+ *
+ * Both grains overlap with the block. Output should be the sum of both grains.
+ */
+TEST_CASE("Granulator processActiveGrains() with overlapping grains", "[Granulator][processActiveGrains]")
+{
+	constexpr double sampleRate = 48000.0;
+	constexpr int blockSize = 128;
+	constexpr int circularBufferSize = 2048;
+	constexpr float detectedPeriod = 256.0f;
+	constexpr int grainSize = static_cast<int>(detectedPeriod * 2); // 512
+
+	Granulator granulator;
+	granulator.prepare(sampleRate, blockSize, grainSize);
+	granulator.getWindow().setSizeShapePeriod(static_cast<int>(sampleRate), Window::Shape::kNone, grainSize);
+
+	CircularBuffer circularBuffer;
+	circularBuffer.setSize(2, circularBufferSize);
+	juce::AudioBuffer<float> onesBuffer(2, circularBufferSize);
+	BufferFiller::fillWithAllOnes(onesBuffer);
+	circularBuffer.pushBuffer(onesBuffer);
+
+	// Create two overlapping grains
+	// Grain 1: spans 100-611
+	granulator.makeGrain(circularBuffer,
+						 {0, 256, 511},
+						 {100, 356, 611},
+						 detectedPeriod);
+
+	// Grain 2: spans 300-811
+	granulator.makeGrain(circularBuffer,
+						 {0, 256, 511},
+						 {300, 556, 811},
+						 detectedPeriod);
+
+	auto& grains = granulator.getGrains();
+	int activeCount = 0;
+	for (int i = 0; i < kNumGrains; ++i)
+		if (grains[i].isActive) activeCount++;
+	REQUIRE(activeCount == 2);
+
+	juce::AudioBuffer<float> processBuffer(2, blockSize);
+	processBuffer.clear();
+
+	// Block spans 400-527, both grains overlap entirely
+	std::tuple<juce::int64, juce::int64> processCounterRange = {400, 527};
+	granulator.processActiveGrains(processBuffer, processCounterRange);
+
+	// With two grains of all-ones and no windowing, overlap-add should give 2.0
+	int samplesWithOverlap = 0;
+	for (int i = 0; i < blockSize; ++i)
+	{
+		float sample = processBuffer.getSample(0, i);
+		// Both grains contribute 1.0, so sum should be 2.0
+		if (sample == 2.0f)
+			samplesWithOverlap++;
+	}
+
+	INFO("Samples with overlap sum (2.0): " << samplesWithOverlap << " (expected " << blockSize << ")");
+	CHECK(samplesWithOverlap == blockSize);
+
+	// Both grains should still be active (neither ends within this block)
+	activeCount = 0;
+	for (int i = 0; i < kNumGrains; ++i)
+		if (grains[i].isActive) activeCount++;
+	CHECK(activeCount == 2);
 }

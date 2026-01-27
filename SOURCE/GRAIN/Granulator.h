@@ -41,6 +41,7 @@ public:
 
 	std::array<Grain, kNumGrains>& getGrains() { return mGrains; }
 	juce::int64 getSynthMark() const { return mSynthMark; }
+	void resetSynthMark() { mSynthMark = -1; }
 	Window& getWindow() { return mWindow; }
 
 	// Create and activate a new grain
