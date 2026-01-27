@@ -128,7 +128,8 @@ void Granulator::makeGrain(CircularBuffer& circularBuffer,
 	Grain& grain = mGrains[grainIndex];
 
 	// Configure window period for this grain size
-	int grainSize = static_cast<int>(detectedPeriod * 2.0f);
+	// Use same truncation as PluginProcessor::getAnalysisReadRange to avoid mismatch
+	int grainSize = static_cast<int>(detectedPeriod) * 2;
 	mWindow.setPeriod(grainSize);
 	mWindow.resetReadPos();
 
