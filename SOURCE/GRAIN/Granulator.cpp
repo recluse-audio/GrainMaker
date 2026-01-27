@@ -35,34 +35,60 @@ void Granulator::prepare(double sampleRate, int blockSize, int maxGrainSize)
 void Granulator::processDetecting(juce::AudioBuffer<float>& processBlock, CircularBuffer& circularBuffer,
 									std::tuple<int, int> dryBlockRange, std::tuple<int, int> processCounterRange)
 {
+	// Read dry audio from circular buffer and write to processBlock
+	int dryStart = std::get<0>(dryBlockRange);
+	int dryEnd = std::get<1>(dryBlockRange);
+	int numChannels = processBlock.getNumChannels();
+
+	for (int sampleIndex = dryStart; sampleIndex < dryEnd; ++sampleIndex)
+	{
+		int blockIndex = sampleIndex - dryStart;
+		int wrappedIndex = circularBuffer.getWrappedIndex(sampleIndex);
+
+		for (int ch = 0; ch < numChannels; ++ch)
+		{
+			float sample = circularBuffer.getBuffer().getSample(ch, wrappedIndex);
+			processBlock.setSample(ch, blockIndex, sample);
+		}
+	}
+
+	// Process any active grains (overlap-add on top of dry signal)
 	processActiveGrains(processBlock, processCounterRange);
 }
 
 //=======================================
 void Granulator::processTracking(juce::AudioBuffer<float>& processBlock, CircularBuffer& circularBuffer,
-				 		std::tuple<juce::int64, juce::int64, juce::int64> analysisReadRangeInSampleCount, 
+				 		std::tuple<juce::int64, juce::int64, juce::int64> analysisReadRangeInSampleCount,
 						std::tuple<juce::int64, juce::int64, juce::int64> analysisWriteRangeInSampleCount,
 						std::tuple<juce::int64, juce::int64> processCounterRange,
 				  		float detectedPeriod,  float shiftedPeriod)
 {
-	// center of next would be grain.
-	juce::int64 nextAnalysisWriteMark = std::get<1>(analysisWriteRangeInSampleCount) + (juce::int64)(detectedPeriod);
+	juce::int64 currentAnalysisWriteMark = std::get<1>(analysisWriteRangeInSampleCount);
+	juce::int64 nextAnalysisWriteMark = currentAnalysisWriteMark + (juce::int64)(detectedPeriod);
 
-	// This while loop is intended to make a grain for every synth mark 
+	// If mSynthMark has drifted too far ahead of currentAnalysisWriteMark (due to detection variance),
+	// resync it to prevent grain emission from stalling. This can happen when the detected peak
+	// is found slightly earlier than predicted, causing analysisWriteMark to be behind mSynthMark.
+	if(mSynthMark > nextAnalysisWriteMark)
+	{
+		mSynthMark = currentAnalysisWriteMark;
+	}
+
+	// This while loop is intended to make a grain for every synth mark
 	// between grainRange.start -> grainRange.mid. it is not "start -> end" because of overlap
 	// mSynthMark matches analysisWriteMark when tracking starts, then increments by shifted period.
 	// If shifting up we'd need 2 synth marks before we have the next analysis marker
-	// CURRENT STRATEGY: 
+	// CURRENT STRATEGY:
 	// 	Use same analysisRange for grains who's synth marks are within same analysisWriteRange
 	// 	[ currentGrainWriteStart ]-----------------[ currentGrainWriteMark(mid) ]------------------[ currentGrainWriteEnd ]
 	while(mSynthMark < nextAnalysisWriteMark)
 	{
-		// no previous marks 
+		// no previous marks
 		if(mSynthMark < 0)
 		{
-			mSynthMark = std::get<1>(analysisWriteRangeInSampleCount);
+			mSynthMark = currentAnalysisWriteMark;
 		}
-		
+
 		juce::int64 synthStart = mSynthMark - (juce::int64)detectedPeriod;
 		juce::int64 synthEnd = mSynthMark + (juce::int64)detectedPeriod - 1;
 		std::tuple<juce::int64, juce::int64, juce::int64> synthRangeInSampleCount = {synthStart, mSynthMark, synthEnd};

@@ -171,15 +171,36 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
 	buffer.clear();
     mDetectionBuffer.clear();
 
-    ProcessState prevProcessState = mProcessState;
 
+    float detected_period = doDetection(buffer);
+
+    doCorrection(buffer, detected_period);
+
+	mSamplesProcessed += buffer.getNumSamples();
+}
+
+//=============================================================================
+float PluginProcessor::doDetection(juce::AudioBuffer<float>& processBuffer)
+{
     // range we will detect on
     auto [detectStart, detectEnd] = getDetectionRange();
     mCircularBuffer->readRange(mDetectionBuffer, detectStart);
 
     // Try and detect pitch, update state accordingly in temp variable for now
     float detected_period = mPitchDetector->process(mDetectionBuffer);
-    if(detected_period > 2)
+    return detected_period;
+}
+
+//=============================================================================
+void PluginProcessor::doCorrection(juce::AudioBuffer<float>& processBuffer, float detectedPeriod)
+{
+    // auto processCounterRange = getProcessCounterRange();
+    // auto dryBufferRange = getDryBlockRange();
+    // mGranulator->processDetecting(processBuffer, *mCircularBuffer.get(), dryBufferRange, processCounterRange);
+    
+    ProcessState prevProcessState = mProcessState;
+
+    if(detectedPeriod > 2)
         mProcessState = ProcessState::kTracking;
     else
         mProcessState = ProcessState::kDetecting;
@@ -189,36 +210,38 @@ void PluginProcessor::processBlock (juce::AudioBuffer<float>& buffer,
     if(mProcessState == ProcessState::kDetecting)
     {
         if(prevProcessState == ProcessState::kTracking)
+        {
             mPredictedNextAnalysisMark = -1;
+            mGranulator->resetSynthMark();
+        }
 
         auto dryBufferRange = getDryBlockRange();
-        mGranulator->processDetecting(buffer, *mCircularBuffer.get(), dryBufferRange, processCounterRange);
+        mGranulator->processDetecting(processBuffer, *mCircularBuffer.get(), dryBufferRange, processCounterRange);
     }
     else if (mProcessState == ProcessState::kTracking)
     {
-        float shiftedPeriod = detected_period / mShiftRatio;
+        float shiftedPeriod = detectedPeriod / mShiftRatio;
         std::tuple<juce::int64, juce::int64> peakRange{0, 0};
 
+        peakRange = getFirstPeakRange(detectedPeriod);
+
         // if we just started tracking, we need to find the first peak range 
-        if(prevProcessState == ProcessState::kDetecting)
-            peakRange = getFirstPeakRange(detected_period);
-        else
-            peakRange = getPrecisePeakRange(mPredictedNextAnalysisMark, detected_period);
+        // if(prevProcessState == ProcessState::kDetecting)
+        //     peakRange = getFirstPeakRange(detectedPeriod);
+        // else
+        //     peakRange = getPrecisePeakRange(mPredictedNextAnalysisMark, detectedPeriod);
 
         juce::Range<juce::int64> peakRangeInCircularBuffer;
         peakRangeInCircularBuffer.setStart(std::get<0>(peakRange));
         peakRangeInCircularBuffer.setEnd(std::get<1>(peakRange));
         juce::int64 markedIndex = mCircularBuffer->findPeakInRange(peakRangeInCircularBuffer);
-        mPredictedNextAnalysisMark = markedIndex + shiftedPeriod;
+        mPredictedNextAnalysisMark = markedIndex + detectedPeriod;
 
-        auto analysisReadRange = getAnalysisReadRange(markedIndex, detected_period);
+        auto analysisReadRange = getAnalysisReadRange(markedIndex, detectedPeriod);
         auto analysisWriteRange = getAnalysisWriteRange(analysisReadRange);
 
-        mGranulator->processTracking(buffer, *mCircularBuffer.get(), analysisReadRange, analysisWriteRange, getProcessCounterRange(), detected_period, shiftedPeriod);
+        mGranulator->processTracking(processBuffer, *mCircularBuffer.get(), analysisReadRange, analysisWriteRange, getProcessCounterRange(), detectedPeriod, shiftedPeriod);
     }
-
-
-	mSamplesProcessed += buffer.getNumSamples();
 }
 
 //==============================================================================

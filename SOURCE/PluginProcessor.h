@@ -30,6 +30,8 @@ public:
     bool isBusesLayoutSupported (const BusesLayout& layouts) const override;
 
     void processBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
+    float doDetection(juce::AudioBuffer<float>& processBuffer);
+    void doCorrection(juce::AudioBuffer<float>& processBuffer, float detectedPeriod);
 
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override;
