@@ -102,7 +102,7 @@ void PluginEditor::resized()
 //==================================
 void PluginEditor::timerCallback()
 {
-	float currentPitch = mProcessor.getLastDetectedPitch();
+	float currentPitch = mProcessor.getLastDetectedPeriod();
 	auto pitchString = juce::String(currentPitch);
 	mPitchDisplay->setText(pitchString, juce::NotificationType::dontSendNotification);
 }

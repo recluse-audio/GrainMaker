@@ -20,7 +20,11 @@ void Grain::prepare(int maxGrainSize, int numChannels)
 {
 	mBuffer.setSize(numChannels, maxGrainSize);
 	mBuffer.clear();
+
+	mWindowBuffer.setSize(numChannels, maxGrainSize);
+	mWindowBuffer.clear();
 }
+
 
 //=======================================
 void Grain::reset()
@@ -29,4 +33,5 @@ void Grain::reset()
 	mAnalysisRange = { -1, -1, -1 };
 	mSynthRange = { -1, -1, -1 };
 	mBuffer.clear();
+	mWindowBuffer.clear();
 }

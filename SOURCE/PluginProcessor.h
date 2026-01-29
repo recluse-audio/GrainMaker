@@ -32,6 +32,9 @@ public:
     void processBlock (juce::AudioBuffer<float>&, juce::MidiBuffer&) override;
     float doDetection(juce::AudioBuffer<float>& processBuffer);
     void doCorrection(juce::AudioBuffer<float>& processBuffer, float detectedPeriod);
+    juce::int64 refineMarkByCorrelation(juce::int64 predictedMark, float detectedPeriod);
+    inline float readMonoSample(juce::int64 sampleIndex) const;
+    juce::int64 chooseStablePitchMark(const juce::int64 endDetectionSample, const float detectedPeriod);
 
     juce::AudioProcessorEditor* createEditor() override;
     bool hasEditor() const override;

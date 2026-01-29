@@ -2,6 +2,14 @@
  * Created by Ryan Devens 2025-10-13
  */
 
+#define _USE_MATH_DEFINES
+#include <cmath>
+#include <iostream>
+
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
 #include "../SOURCE/GRAIN/Granulator.h"
@@ -270,7 +278,7 @@ TEST_CASE("Granulator _makeGrain() copies correct samples with no windowing", "[
 	std::tuple<juce::int64, juce::int64, juce::int64> synthRange = {1000, 1100, 1199};
 
 	// Call _makeGrain through tester
-	granulator.makeGrain(circularBuffer, analysisReadRange, synthRange, detectedPeriod);
+	granulator.makeGrain(circularBuffer, analysisReadRange, synthRange, detectedPeriod, detectedPeriod);
 
 	// Verify grain was created
 	auto& grains = granulator.getGrains();
@@ -339,7 +347,7 @@ TEST_CASE("Granulator _makeGrain() applies Hanning window correctly", "[Granulat
 	std::tuple<juce::int64, juce::int64, juce::int64> synthRange = {1000, 1100, 1199};
 
 	// Call _makeGrain through tester
-	granulator.makeGrain(circularBuffer, analysisReadRange, synthRange, detectedPeriod);
+	granulator.makeGrain(circularBuffer, analysisReadRange, synthRange, detectedPeriod, detectedPeriod);
 
 	// Verify grain was created
 	auto& grains = granulator.getGrains();
@@ -757,7 +765,7 @@ TEST_CASE("Granulator makeGrain() fills grain buffer correctly near 4096 sample 
 		std::tuple<juce::int64, juce::int64, juce::int64> analysisReadRange = {2944, 3200, 3455};
 		std::tuple<juce::int64, juce::int64, juce::int64> synthRange = {3456, 3712, 3967};
 
-		granulator.makeGrain(circularBuffer, analysisReadRange, synthRange, detectedPeriod);
+		granulator.makeGrain(circularBuffer, analysisReadRange, synthRange, detectedPeriod, detectedPeriod);
 
 		// Verify grain was created
 		auto& grains = granulator.getGrains();
@@ -795,7 +803,7 @@ TEST_CASE("Granulator makeGrain() fills grain buffer correctly near 4096 sample 
 		std::tuple<juce::int64, juce::int64, juce::int64> analysisReadRange = {3644, 3900, 4155};
 		std::tuple<juce::int64, juce::int64, juce::int64> synthRange = {4156, 4412, 4667};
 
-		granulator.makeGrain(circularBuffer, analysisReadRange, synthRange, detectedPeriod);
+		granulator.makeGrain(circularBuffer, analysisReadRange, synthRange, detectedPeriod, detectedPeriod);
 
 		// Verify grain was created
 		auto& grains = granulator.getGrains();
@@ -842,7 +850,7 @@ TEST_CASE("Granulator makeGrain() fills grain buffer correctly near 4096 sample 
 		std::tuple<juce::int64, juce::int64, juce::int64> analysisReadRange = {3844, 4100, 4355};
 		std::tuple<juce::int64, juce::int64, juce::int64> synthRange = {4356, 4612, 4867};
 
-		granulator.makeGrain(circularBuffer, analysisReadRange, synthRange, detectedPeriod);
+		granulator.makeGrain(circularBuffer, analysisReadRange, synthRange, detectedPeriod, detectedPeriod);
 
 		auto& grains = granulator.getGrains();
 		REQUIRE(grains[0].isActive == true);
@@ -1053,7 +1061,7 @@ TEST_CASE("Granulator processActiveGrains() with single active grain", "[Granula
 	std::tuple<juce::int64, juce::int64, juce::int64> analysisReadRange = {0, 256, 511};
 	std::tuple<juce::int64, juce::int64, juce::int64> synthRange = {100, 356, 611}; // Grain spans samples 100-611
 
-	granulator.makeGrain(circularBuffer, analysisReadRange, synthRange, detectedPeriod);
+	granulator.makeGrain(circularBuffer, analysisReadRange, synthRange, detectedPeriod, detectedPeriod);
 
 	auto& grains = granulator.getGrains();
 	REQUIRE(grains[0].isActive == true);
@@ -1113,7 +1121,7 @@ TEST_CASE("Granulator processActiveGrains() grain ends mid-block", "[Granulator]
 	std::tuple<juce::int64, juce::int64, juce::int64> analysisReadRange = {0, 256, 511};
 	std::tuple<juce::int64, juce::int64, juce::int64> synthRange = {100, 356, 611};
 
-	granulator.makeGrain(circularBuffer, analysisReadRange, synthRange, detectedPeriod);
+	granulator.makeGrain(circularBuffer, analysisReadRange, synthRange, detectedPeriod, detectedPeriod);
 
 	auto& grains = granulator.getGrains();
 	REQUIRE(grains[0].isActive == true);
@@ -1188,7 +1196,7 @@ TEST_CASE("Granulator processActiveGrains() grain starts mid-block", "[Granulato
 	std::tuple<juce::int64, juce::int64, juce::int64> analysisReadRange = {0, 256, 511};
 	std::tuple<juce::int64, juce::int64, juce::int64> synthRange = {550, 806, 1061};
 
-	granulator.makeGrain(circularBuffer, analysisReadRange, synthRange, detectedPeriod);
+	granulator.makeGrain(circularBuffer, analysisReadRange, synthRange, detectedPeriod, detectedPeriod);
 
 	auto& grains = granulator.getGrains();
 	REQUIRE(grains[0].isActive == true);
@@ -1264,7 +1272,7 @@ TEST_CASE("Granulator processActiveGrains() grain starts and ends within block",
 	std::tuple<juce::int64, juce::int64, juce::int64> analysisReadRange = {0, 64, 127};
 	std::tuple<juce::int64, juce::int64, juce::int64> synthRange = {520, 584, 647};
 
-	granulator.makeGrain(circularBuffer, analysisReadRange, synthRange, detectedPeriod);
+	granulator.makeGrain(circularBuffer, analysisReadRange, synthRange, detectedPeriod, detectedPeriod);
 
 	auto& grains = granulator.getGrains();
 	REQUIRE(grains[0].isActive == true);
@@ -1343,12 +1351,14 @@ TEST_CASE("Granulator processActiveGrains() with overlapping grains", "[Granulat
 	granulator.makeGrain(circularBuffer,
 						 {0, 256, 511},
 						 {100, 356, 611},
+						 detectedPeriod,
 						 detectedPeriod);
 
 	// Grain 2: spans 300-811
 	granulator.makeGrain(circularBuffer,
 						 {0, 256, 511},
 						 {300, 556, 811},
+						 detectedPeriod,
 						 detectedPeriod);
 
 	auto& grains = granulator.getGrains();
@@ -1382,4 +1392,407 @@ TEST_CASE("Granulator processActiveGrains() with overlapping grains", "[Granulat
 	for (int i = 0; i < kNumGrains; ++i)
 		if (grains[i].isActive) activeCount++;
 	CHECK(activeCount == 2);
+}
+
+//=======================================================================================
+//=======================================================================================
+// WAVEFORM CONTINUITY TESTS - PHASE-SHIFTED GRAIN CREATION
+//=======================================================================================
+/**
+ * Test that grains are created with proper phase offsets when pitch shifting.
+ *
+ * The Granulator uses mCumulativePhase to track phase continuity. When creating grains,
+ * the audio data is read with a sample offset based on this cumulative phase, ensuring
+ * waveform continuity across grain boundaries during pitch shifting.
+ *
+ * For pitch shift UP (detected period 256, shifted period 192):
+ * - Grain 1: phase offset = 0 samples (starts at cycle beginning)
+ * - Grain 2: phase offset = 192 samples worth of phase = 3π/2 → ~192 sample offset in period
+ * - Grain 3: cumulative phase wraps, continues the pattern
+ *
+ * This test verifies that multiple grains are created when pitch shifting.
+ */
+TEST_CASE("Granulator creates multiple grains with phase continuity when pitch shifting up", "[Granulator][makeGrain][phase]")
+{
+	constexpr double sampleRate = 48000.0;
+	constexpr int blockSize = 128;
+	constexpr int circularBufferSize = 4096;
+	constexpr float detectedPeriod = 256.0f;
+	constexpr float shiftedPeriod = 192.0f; // Pitch shift UP
+
+	// Create and prepare Granulator
+	Granulator granulator;
+	int maxGrainSize = static_cast<int>(detectedPeriod * 2);
+	granulator.prepare(sampleRate, blockSize, maxGrainSize);
+
+	// Create CircularBuffer and fill with test signal
+	CircularBuffer circularBuffer;
+	circularBuffer.setSize(2, circularBufferSize);
+	juce::AudioBuffer<float> sineBuffer(2, circularBufferSize);
+	BufferFiller::generateSineCycles(sineBuffer, static_cast<int>(detectedPeriod));
+	circularBuffer.pushBuffer(sineBuffer);
+
+	// Create process buffer
+	juce::AudioBuffer<float> processBuffer(2, blockSize);
+	processBuffer.clear();
+
+	// First call to processTracking - should create 2 grains due to shorter shifted period
+	std::tuple<juce::int64, juce::int64, juce::int64> analysisReadRange1 = {744, 1000, 1255};
+	std::tuple<juce::int64, juce::int64, juce::int64> analysisWriteRange1 = {1536, 1792, 2047};
+	std::tuple<juce::int64, juce::int64> processCounterRange1 = {1536, 1663};
+
+	granulator.processTracking(processBuffer, circularBuffer,
+							   analysisReadRange1, analysisWriteRange1,
+							   processCounterRange1,
+							   detectedPeriod, shiftedPeriod);
+
+	auto& grains = granulator.getGrains();
+
+	// Count active grains
+	int activeCount = 0;
+	for (const auto& grain : grains)
+		if (grain.isActive) activeCount++;
+
+	// Should have created 2 grains in one call when pitch shifting up
+	CHECK(activeCount == 2);
+
+	// Verify the grains were created at expected synth marks
+	bool foundGrain1 = false;
+	bool foundGrain2 = false;
+	for (const auto& grain : grains)
+	{
+		if (!grain.isActive) continue;
+		auto [sStart, sMark, sEnd] = grain.mSynthRange;
+		if (sMark == 1792) foundGrain1 = true;
+		if (sMark == 1984) foundGrain2 = true;
+	}
+	CHECK(foundGrain1);
+	CHECK(foundGrain2);
+}
+
+/**
+ * Test waveform phase alignment across multiple grains with sine wave input.
+ *
+ * This test verifies that when grains are created with phase offsets, the audio data
+ * in each grain buffer correctly represents a phase-shifted version of the source waveform.
+ *
+ * We use a sine wave with period=256 samples and no windowing to directly observe the
+ * phase continuity. Each grain's buffer should contain the sine wave starting at the
+ * phase determined by mCumulativePhase.
+ */
+TEST_CASE("Granulator grain buffers contain correctly phase-shifted sine waves", "[Granulator][makeGrain][phase][continuity]")
+{
+	constexpr double sampleRate = 48000.0;
+	constexpr int blockSize = 128;
+	constexpr int circularBufferSize = 4096;
+	constexpr float detectedPeriod = 256.0f;
+	constexpr int grainSize = static_cast<int>(detectedPeriod * 2); // 512
+	constexpr float tolerance = 0.05f;
+
+	SECTION("Pitch shift UP: grains should have incrementing phase offsets")
+	{
+		constexpr float shiftedPeriod = 192.0f; // Shift up
+
+		Granulator granulator;
+		granulator.prepare(sampleRate, blockSize, grainSize);
+		granulator.getWindow().setSizeShapePeriod(static_cast<int>(sampleRate), Window::Shape::kNone, grainSize);
+
+		CircularBuffer circularBuffer;
+		circularBuffer.setSize(2, circularBufferSize);
+		juce::AudioBuffer<float> sineBuffer(2, circularBufferSize);
+		BufferFiller::generateSineCycles(sineBuffer, static_cast<int>(detectedPeriod));
+		circularBuffer.pushBuffer(sineBuffer);
+
+		juce::AudioBuffer<float> processBuffer(2, blockSize);
+		processBuffer.clear();
+
+		// First processTracking call - creates grain 1 and grain 2
+		// analysisWriteRange centered at 512 (2 periods from start)
+		granulator.processTracking(processBuffer, circularBuffer,
+								   {0, 256, 511},      // analysisReadRange
+								   {256, 512, 767},    // analysisWriteRange (synthMark starts at 512)
+								   {256, 383},         // processCounterRange
+								   detectedPeriod, shiftedPeriod);
+
+		auto& grains = granulator.getGrains();
+
+		// Grain 1: synthMark = 512, phase = 0 (512 % 256 = 0)
+		// Grain 2: synthMark = 704 (512 + 192), phase = (704 % 256) / 256 * 2π = (192/256) * 2π = 3π/2
+		double expectedPhase1 = 0.0;
+		double expectedPhase2 = (192.0 / 256.0) * 2.0 * M_PI; // 3π/2
+
+		// Create reference sine buffers for comparison
+		juce::AudioBuffer<float> referenceSine1(2, grainSize);
+		juce::AudioBuffer<float> referenceSine2(2, grainSize);
+		BufferFiller::generateSineWithPhase(referenceSine1, detectedPeriod, expectedPhase1);
+		BufferFiller::generateSineWithPhase(referenceSine2, detectedPeriod, expectedPhase2);
+
+		for (const auto& grain : grains)
+		{
+			if (!grain.isActive) continue;
+
+			auto [sStart, sMark, sEnd] = grain.mSynthRange;
+			const auto& grainBuffer = grain.getBuffer();
+
+			if (sMark == 512)
+			{
+				std::cout << "\n>>> Verifying Grain 1 (synthMark=512) has phase offset 0 <<<" << std::endl;
+				std::cout << "Expected phase: " << expectedPhase1 << " (0)" << std::endl;
+
+				// Print first 10 samples
+				std::cout << "First 10 samples comparison:" << std::endl;
+				int mismatchCount = 0;
+				for (int i = 0; i < std::min(10, grainSize); ++i)
+				{
+					auto [matches, val1, val2] = BufferHelper::samplesMatchAtIndex(grainBuffer, referenceSine1, i, 0, tolerance);
+					std::cout << "  [" << i << "] grain=" << val1 << ", ref=" << val2 << ", diff=" << (val1 - val2) << std::endl;
+				}
+
+				// Check middle section
+				std::cout << "Checking samples 10 to 50:" << std::endl;
+				for (int i = 10; i < std::min(50, grainSize - 10); ++i)
+				{
+					auto [matches, val1, val2] = BufferHelper::samplesMatchAtIndex(grainBuffer, referenceSine1, i, 0, tolerance);
+					if (!matches)
+					{
+						mismatchCount++;
+						if (mismatchCount <= 10)
+							std::cout << "  MISMATCH [" << i << "] grain=" << val1 << ", ref=" << val2 << ", diff=" << (val1 - val2) << std::endl;
+					}
+				}
+				std::cout << "Total mismatches: " << mismatchCount << "\n" << std::endl;
+				CHECK(mismatchCount == 0);
+			}
+			else if (sMark == 704)
+			{
+				std::cout << "\n>>> Verifying Grain 2 (synthMark=704) has phase offset 3π/2 <<<" << std::endl;
+				std::cout << "Expected phase: " << expectedPhase2 << " (" << (expectedPhase2 / M_PI) << "π)" << std::endl;
+
+				// Print first 10 samples
+				std::cout << "First 10 samples comparison:" << std::endl;
+				int mismatchCount = 0;
+				for (int i = 0; i < std::min(10, grainSize); ++i)
+				{
+					auto [matches, val1, val2] = BufferHelper::samplesMatchAtIndex(grainBuffer, referenceSine2, i, 0, tolerance);
+					std::cout << "  [" << i << "] grain=" << val1 << ", ref=" << val2 << ", diff=" << (val1 - val2) << std::endl;
+				}
+
+				// Check middle section
+				std::cout << "Checking samples 10 to 50:" << std::endl;
+				for (int i = 10; i < std::min(50, grainSize - 10); ++i)
+				{
+					auto [matches, val1, val2] = BufferHelper::samplesMatchAtIndex(grainBuffer, referenceSine2, i, 0, tolerance);
+					if (!matches)
+					{
+						mismatchCount++;
+						if (mismatchCount <= 10)
+							std::cout << "  MISMATCH [" << i << "] grain=" << val1 << ", ref=" << val2 << ", diff=" << (val1 - val2) << std::endl;
+					}
+				}
+				std::cout << "Total mismatches: " << mismatchCount << "\n" << std::endl;
+				CHECK(mismatchCount == 0);
+			}
+		}
+
+		// Second call - creates grain 3
+		// mSynthMark is now at 896 (704 + 192)
+		processBuffer.clear();
+		granulator.processTracking(processBuffer, circularBuffer,
+								   {256, 512, 767},    // analysisReadRange
+								   {512, 768, 1023},   // analysisWriteRange
+								   {384, 511},         // processCounterRange
+								   detectedPeriod, shiftedPeriod);
+
+		// Grain 3: synthMark = 896, phase = (896 % 256) / 256 * 2π = (128/256) * 2π = π
+		double expectedPhase3 = (128.0 / 256.0) * 2.0 * M_PI; // π
+		juce::AudioBuffer<float> referenceSine3(2, grainSize);
+		BufferFiller::generateSineWithPhase(referenceSine3, detectedPeriod, expectedPhase3);
+
+		for (const auto& grain : grains)
+		{
+			if (!grain.isActive) continue;
+
+			auto [sStart, sMark, sEnd] = grain.mSynthRange;
+			if (sMark == 896)
+			{
+				const auto& grainBuffer = grain.getBuffer();
+				std::cout << "\n>>> Verifying Grain 3 (synthMark=896) has phase offset π <<<" << std::endl;
+				std::cout << "Expected phase: " << expectedPhase3 << " (" << (expectedPhase3 / M_PI) << "π)" << std::endl;
+
+				// Print first 10 samples
+				std::cout << "First 10 samples comparison:" << std::endl;
+				int mismatchCount = 0;
+				for (int i = 0; i < std::min(10, grainSize); ++i)
+				{
+					auto [matches, val1, val2] = BufferHelper::samplesMatchAtIndex(grainBuffer, referenceSine3, i, 0, tolerance);
+					std::cout << "  [" << i << "] grain=" << val1 << ", ref=" << val2 << ", diff=" << (val1 - val2) << std::endl;
+				}
+
+				// Check middle section
+				std::cout << "Checking samples 10 to 50:" << std::endl;
+				for (int i = 10; i < std::min(50, grainSize - 10); ++i)
+				{
+					auto [matches, val1, val2] = BufferHelper::samplesMatchAtIndex(grainBuffer, referenceSine3, i, 0, tolerance);
+					if (!matches)
+					{
+						mismatchCount++;
+						if (mismatchCount <= 10)
+							std::cout << "  MISMATCH [" << i << "] grain=" << val1 << ", ref=" << val2 << ", diff=" << (val1 - val2) << std::endl;
+					}
+				}
+				std::cout << "Total mismatches: " << mismatchCount << "\n" << std::endl;
+				CHECK(mismatchCount == 0);
+			}
+		}
+	}
+
+	SECTION("Pitch shift DOWN: grains should have incrementing phase offsets")
+	{
+		constexpr float shiftedPeriod = 320.0f; // Shift down
+
+		Granulator granulator;
+		granulator.prepare(sampleRate, blockSize, grainSize);
+		granulator.getWindow().setSizeShapePeriod(static_cast<int>(sampleRate), Window::Shape::kNone, grainSize);
+
+		CircularBuffer circularBuffer;
+		circularBuffer.setSize(2, circularBufferSize);
+		juce::AudioBuffer<float> sineBuffer(2, circularBufferSize);
+		BufferFiller::generateSineCycles(sineBuffer, static_cast<int>(detectedPeriod));
+		circularBuffer.pushBuffer(sineBuffer);
+
+		juce::AudioBuffer<float> processBuffer(2, blockSize);
+
+		// First call - creates grain 1
+		// synthMark starts at 512 (512 % 256 = 0, so phase = 0)
+		processBuffer.clear();
+		granulator.processTracking(processBuffer, circularBuffer,
+								   {0, 256, 511},      // analysisReadRange
+								   {256, 512, 767},    // analysisWriteRange (synthMark starts at 512)
+								   {256, 383},         // processCounterRange
+								   detectedPeriod, shiftedPeriod);
+
+		auto& grains = granulator.getGrains();
+
+		// Grain 1: synthMark = 512, phase = 0
+		double expectedPhase1 = 0.0;
+		juce::AudioBuffer<float> referenceSine1(2, grainSize);
+		BufferFiller::generateSineWithPhase(referenceSine1, detectedPeriod, expectedPhase1);
+
+		for (const auto& grain : grains)
+		{
+			if (!grain.isActive) continue;
+
+			auto [sStart, sMark, sEnd] = grain.mSynthRange;
+			if (sMark == 512)
+			{
+				const auto& grainBuffer = grain.getBuffer();
+				std::cout << "\n>>> Verifying Grain 1 (synthMark=512) has phase offset 0 <<<" << std::endl;
+
+				int mismatchCount = 0;
+				for (int i = 10; i < std::min(50, grainSize - 10); ++i)
+				{
+					auto [matches, val1, val2] = BufferHelper::samplesMatchAtIndex(grainBuffer, referenceSine1, i, 0, tolerance);
+					if (!matches) mismatchCount++;
+				}
+				std::cout << "Mismatch count: " << mismatchCount << "\n" << std::endl;
+				CHECK(mismatchCount == 0);
+			}
+		}
+
+		// Second call - creates grain 2
+		// mSynthMark is now at 832 (512 + 320)
+		// 832 % 256 = 64, so phase = (64/256) * 2π = π/2
+		processBuffer.clear();
+		granulator.processTracking(processBuffer, circularBuffer,
+								   {256, 512, 767},    // analysisReadRange
+								   {512, 768, 1023},   // analysisWriteRange
+								   {384, 511},         // processCounterRange
+								   detectedPeriod, shiftedPeriod);
+
+		// Grain 2: synthMark = 832, phase = (64/256) * 2π = π/2
+		double expectedPhase2 = (64.0 / 256.0) * 2.0 * M_PI; // π/2
+		juce::AudioBuffer<float> referenceSine2(2, grainSize);
+		BufferFiller::generateSineWithPhase(referenceSine2, detectedPeriod, expectedPhase2);
+
+		for (const auto& grain : grains)
+		{
+			if (!grain.isActive) continue;
+
+			auto [sStart, sMark, sEnd] = grain.mSynthRange;
+			if (sMark == 832)
+			{
+				const auto& grainBuffer = grain.getBuffer();
+				std::cout << "\n>>> Verifying Grain 2 (synthMark=832) has phase offset π/2 <<<" << std::endl;
+
+				int mismatchCount = 0;
+				for (int i = 10; i < std::min(50, grainSize - 10); ++i)
+				{
+					auto [matches, val1, val2] = BufferHelper::samplesMatchAtIndex(grainBuffer, referenceSine2, i, 0, tolerance);
+					if (!matches) mismatchCount++;
+				}
+				std::cout << "Mismatch count: " << mismatchCount << "\n" << std::endl;
+				CHECK(mismatchCount == 0);
+			}
+		}
+	}
+
+	SECTION("No pitch shift: all grains should have phase offset 0")
+	{
+		constexpr float shiftedPeriod = 256.0f; // No shift
+
+		Granulator granulator;
+		granulator.prepare(sampleRate, blockSize, grainSize);
+		granulator.getWindow().setSizeShapePeriod(static_cast<int>(sampleRate), Window::Shape::kNone, grainSize);
+
+		CircularBuffer circularBuffer;
+		circularBuffer.setSize(2, circularBufferSize);
+		juce::AudioBuffer<float> sineBuffer(2, circularBufferSize);
+		BufferFiller::generateSineCycles(sineBuffer, static_cast<int>(detectedPeriod));
+		circularBuffer.pushBuffer(sineBuffer);
+
+		juce::AudioBuffer<float> processBuffer(2, blockSize);
+
+		// Create multiple grains
+		// Grain 1: synthMark = 512 (512 % 256 = 0, phase = 0)
+		processBuffer.clear();
+		granulator.processTracking(processBuffer, circularBuffer,
+								   {0, 256, 511},      // analysisReadRange
+								   {256, 512, 767},    // analysisWriteRange
+								   {256, 383},         // processCounterRange
+								   detectedPeriod, shiftedPeriod);
+
+		// Grain 2: synthMark = 768 (512 + 256), 768 % 256 = 0, phase = 0
+		processBuffer.clear();
+		granulator.processTracking(processBuffer, circularBuffer,
+								   {256, 512, 767},    // analysisReadRange
+								   {512, 768, 1023},   // analysisWriteRange
+								   {384, 511},         // processCounterRange
+								   detectedPeriod, shiftedPeriod);
+
+		auto& grains = granulator.getGrains();
+
+		// With no pitch shift, phase increment = (256/256) * 2π = 2π
+		// So every grain wraps back to phase 0
+		// Expected synthMarks: 512, 768 (both are multiples of 256, so phase = 0)
+		juce::AudioBuffer<float> referenceSine(2, grainSize);
+		BufferFiller::generateSineWithPhase(referenceSine, detectedPeriod, 0.0);
+
+		for (const auto& grain : grains)
+		{
+			if (!grain.isActive) continue;
+
+			auto [sStart, sMark, sEnd] = grain.mSynthRange;
+			const auto& grainBuffer = grain.getBuffer();
+			std::cout << "\n>>> Verifying grain at synthMark=" << sMark << " has phase offset 0 <<<" << std::endl;
+
+			int mismatchCount = 0;
+			for (int i = 10; i < std::min(50, grainSize - 10); ++i)
+			{
+				auto [matches, val1, val2] = BufferHelper::samplesMatchAtIndex(grainBuffer, referenceSine, i, 0, tolerance);
+				if (!matches) mismatchCount++;
+			}
+			std::cout << "Mismatch count: " << mismatchCount << "\n" << std::endl;
+			CHECK(mismatchCount == 0);
+		}
+	}
 }

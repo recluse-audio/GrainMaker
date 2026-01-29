@@ -41,14 +41,15 @@ public:
 
 	std::array<Grain, kNumGrains>& getGrains() { return mGrains; }
 	juce::int64 getSynthMark() const { return mSynthMark; }
-	void resetSynthMark() { mSynthMark = -1; }
+	void resetSynthMark() { mSynthMark = -1; mCumulativePhase = 0.0; }
 	Window& getWindow() { return mWindow; }
 
 	// Create and activate a new grain
 	void makeGrain(CircularBuffer& circularBuffer,
 				   std::tuple<juce::int64, juce::int64, juce::int64> analysisReadRange,
 				   std::tuple<juce::int64, juce::int64, juce::int64> synthRange,
-				   float detectedPeriod);
+				   float detectedPeriod,
+				   float shiftedPeriod);
 
 	// Process all active grains, writing to processBlock
 	void processActiveGrains(juce::AudioBuffer<float>& processBlock,
@@ -57,11 +58,16 @@ public:
 private:
 	friend class GranulatorTester;
 	Window mWindow;
+	juce::AudioBuffer<float> mNormWindowBuffer;
+	juce::AudioBuffer<float> mWetBuffer;
 
 	std::array<Grain, kNumGrains> mGrains;
 
 	// Tracks when to create the next grain
 	juce::int64 mSynthMark = -1;
+
+	// Tracks cumulative phase for grain emission (wraps around 2π)
+	double mCumulativePhase = 0.0;
 
 	// Find an inactive grain slot, returns -1 if none available
 	int _findInactiveGrainIndex();

@@ -19,7 +19,7 @@ public:
 	bool isActive = false;
 	std::tuple<juce::int64, juce::int64, juce::int64> mAnalysisRange { -1, -1, -1 };
 	std::tuple<juce::int64, juce::int64, juce::int64> mSynthRange { -1, -1, -1 };
-
+	int mGrainSize = -1;
 	// Prepare the grain's buffer - call once during setup
 	void prepare(int maxGrainSize, int numChannels);
 
@@ -34,4 +34,5 @@ public:
 private:
 	friend class Granulator;
 	juce::AudioBuffer<float> mBuffer;
+	juce::AudioBuffer<float> mWindowBuffer; // vals applied when windowing grain, for normalization later
 };

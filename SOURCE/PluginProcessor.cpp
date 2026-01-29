@@ -194,55 +194,114 @@ float PluginProcessor::doDetection(juce::AudioBuffer<float>& processBuffer)
 //=============================================================================
 void PluginProcessor::doCorrection(juce::AudioBuffer<float>& processBuffer, float detectedPeriod)
 {
-    // auto processCounterRange = getProcessCounterRange();
-    // auto dryBufferRange = getDryBlockRange();
-    // mGranulator->processDetecting(processBuffer, *mCircularBuffer.get(), dryBufferRange, processCounterRange);
-    
-    ProcessState prevProcessState = mProcessState;
+    const float shiftedPeriod = detectedPeriod / mShiftRatio;
 
-    if(detectedPeriod > 2)
-        mProcessState = ProcessState::kTracking;
-    else
-        mProcessState = ProcessState::kDetecting;
+    const juce::int64 endProcessSample   = mSamplesProcessed + mBlockSize - 1;
+    const juce::int64 endDetectionSample = endProcessSample - MagicNumbers::minLookaheadSize;
 
-    auto processCounterRange = getProcessCounterRange();
+    const juce::int64 markedIndex = chooseStablePitchMark(endDetectionSample, detectedPeriod);
 
-    if(mProcessState == ProcessState::kDetecting)
+    // Prediction for NEXT time (in the SAME coordinate system as markedIndex)
+    mPredictedNextAnalysisMark = markedIndex + (juce::int64)std::llround(detectedPeriod);
+
+    auto analysisReadRange  = getAnalysisReadRange(markedIndex, detectedPeriod);
+    auto analysisWriteRange = getAnalysisWriteRange(analysisReadRange);
+
+    mGranulator->processTracking(
+        processBuffer,
+        *mCircularBuffer.get(),
+        analysisReadRange,
+        analysisWriteRange,
+        getProcessCounterRange(),
+        detectedPeriod,
+        shiftedPeriod);
+}
+
+
+//==================================================================
+juce::int64 PluginProcessor::refineMarkByCorrelation(juce::int64 predictedMark, float detectedPeriod)
+{
+    const int P = (int)std::llround(detectedPeriod);
+    const int radius = std::max(1, P / 4);
+
+    // Reference cycle: one period ending at predictedMark (you can use prevMark instead if you store it)
+    std::vector<float> ref(P);
+    for (int i = 0; i < P; ++i)
+        ref[i] = readMonoSample(predictedMark - P + i);
+
+    double bestScore = -1.0;
+    juce::int64 bestMark = predictedMark;
+
+    for (int off = -radius; off <= radius; ++off)
     {
-        if(prevProcessState == ProcessState::kTracking)
+        const juce::int64 cand = predictedMark + off;
+
+        double num = 0.0, denA = 0.0, denB = 0.0;
+        for (int i = 0; i < P; ++i)
         {
-            mPredictedNextAnalysisMark = -1;
-            mGranulator->resetSynthMark();
+            const float a = ref[i];
+            const float b = readMonoSample(cand - P + i); // compare same-relative cycle
+            num  += (double)a * (double)b;
+            denA += (double)a * (double)a;
+            denB += (double)b * (double)b;
         }
 
-        auto dryBufferRange = getDryBlockRange();
-        mGranulator->processDetecting(processBuffer, *mCircularBuffer.get(), dryBufferRange, processCounterRange);
+        const double score = num / (std::sqrt(denA * denB) + 1e-12);
+        if (score > bestScore)
+        {
+            bestScore = score;
+            bestMark = cand;
+        }
     }
-    else if (mProcessState == ProcessState::kTracking)
+
+    return bestMark;
+}
+
+//==================================================================
+juce::int64 PluginProcessor::chooseStablePitchMark( const juce::int64 endDetectionSample, const float detectedPeriod)
+{
+    const juce::int64 startDetectionSample = endDetectionSample - MagicNumbers::minDetectionSize;
+
+    // If we have a prediction and it's actually inside the detection window,
+    // search narrowly around it.
+    if (mPredictedNextAnalysisMark >= startDetectionSample &&
+        mPredictedNextAnalysisMark <= endDetectionSample)
     {
-        float shiftedPeriod = detectedPeriod / mShiftRatio;
-        std::tuple<juce::int64, juce::int64> peakRange{0, 0};
+        const juce::int64 radius = (juce::int64)std::llround(detectedPeriod * 0.25f);
 
-        peakRange = getFirstPeakRange(detectedPeriod);
+        juce::int64 rs = mPredictedNextAnalysisMark - radius;
+        juce::int64 re = mPredictedNextAnalysisMark + radius;
 
-        // if we just started tracking, we need to find the first peak range 
-        // if(prevProcessState == ProcessState::kDetecting)
-        //     peakRange = getFirstPeakRange(detectedPeriod);
-        // else
-        //     peakRange = getPrecisePeakRange(mPredictedNextAnalysisMark, detectedPeriod);
+        // Clamp to detection window (IMPORTANT: don't search outside written/valid data)
+        rs = juce::jmax(rs, startDetectionSample);
+        re = juce::jmin(re, endDetectionSample);
 
-        juce::Range<juce::int64> peakRangeInCircularBuffer;
-        peakRangeInCircularBuffer.setStart(std::get<0>(peakRange));
-        peakRangeInCircularBuffer.setEnd(std::get<1>(peakRange));
-        juce::int64 markedIndex = mCircularBuffer->findPeakInRange(peakRangeInCircularBuffer);
-        mPredictedNextAnalysisMark = markedIndex + detectedPeriod;
+        juce::Range<juce::int64> r(rs, re);
+        return mCircularBuffer->findPeakInRange(r, 0);
+    }
 
-        auto analysisReadRange = getAnalysisReadRange(markedIndex, detectedPeriod);
-        auto analysisWriteRange = getAnalysisWriteRange(analysisReadRange);
+    // Otherwise, fall back to "first peak range" (wide search),
+    // but it’s inherently jittery until we get a valid prediction.
+    {
+        const juce::int64 re = endDetectionSample;
+        const juce::int64 rs = re - (juce::int64)std::llround(detectedPeriod);
 
-        mGranulator->processTracking(processBuffer, *mCircularBuffer.get(), analysisReadRange, analysisWriteRange, getProcessCounterRange(), detectedPeriod, shiftedPeriod);
+        juce::Range<juce::int64> r(rs, re);
+        return mCircularBuffer->findPeakInRange(r, 0);
     }
 }
+
+
+//==============================================================================
+inline float PluginProcessor::readMonoSample(juce::int64 sampleIndex) const
+{
+    // If your CircularBuffer has a direct getter, use it.
+    // Otherwise adapt to however you read a single sample.
+    const int ch = 0;
+    const int wrapped = mCircularBuffer->getWrappedIndex(sampleIndex);
+    return mCircularBuffer->getBuffer().getSample(ch, wrapped);
+}
+
 
 //==============================================================================
 bool PluginProcessor::hasEditor() const
