@@ -3,7 +3,7 @@
 	url = https://github.com/juce-framework/JUCE.git
 [submodule "SUBMODULES/RD_DSP"]
 	path = SUBMODULES/RD_DSP
-	url = git_user@143.244.153.113:/home/git_user/REPOS/PLUGIN_PROJECTS/RD_DSP
+	url = https://github.com/recluse-audio/RD_DSP.git
 [submodule "SUBMODULES/RD"]
 	path = SUBMODULES/RD
-	url = git_user@143.244.153.113:/home/git_user/REPOS/PLUGIN_PROJECTS/RD
+	url = https://github.com/recluse-audio/RD.git
